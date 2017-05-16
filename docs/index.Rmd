@@ -1,5 +1,5 @@
 ---
-title: "Using the `greta` package to fit DFA models"
+title: "Using the `greta` package to do Dynamic Factor Analysis"
 output:
   html_document:
     theme: cerulean
@@ -22,12 +22,14 @@ Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to tim
 
 $$
 \begin{gathered}
-\mathbf{y}_t = \mathbf{Z}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t \text{ where } \mathbf{v}_t \sim \text{MVN}(0,\mathbf{R}) \\
-\mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t \text{ where } \mathbf{w}_t \sim \text{MVN}(0,\mathbf{Q})
+\mathbf{y}_t = \mathbf{Z}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t \\
+\mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t
 \end{gathered}   
 $$
 
-The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. For convenience, the variance-covariance matrix of the process errors governing the multivariate random walk, $\mathbf{Q}$, is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$. In addition, to make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$, then 
+The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The observation errors are mulitvaraite normal, such that $\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})$. The form for $\mathbf{R}$ can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors $\mathbf{w}_t$ governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$.
+
+In addition, to make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$, then 
 
 $$
 \mathbf{Z} = 
@@ -44,7 +46,9 @@ $$
 
 Solving for the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [`MARSS`](https://cran.r-project.org/web/packages/MARSS/index.html) package, or an MCMC algorithm as implemented in the __Stan__ language via the [`statss`](https://github.com/nwfsc-timeseries/statss) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
 
-The [`greta`](https://github.com/goldingn/greta) package was designed by [Nick Golding](https://scholar.google.co.uk/citations?user=peoal7wAAAAJ&hl=en) to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets.
+For example, a couple of years ago I helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on daily growth rates of juvenile salmon. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with `MARSS` using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
+
+The [`greta`](https://github.com/goldingn/greta) package was designed by [Nick Golding](https://scholar.google.co.uk/citations?user=peoal7wAAAAJ&hl=en) to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal `R` syntax.
 
 ## Installation
 
@@ -57,5 +61,14 @@ devtools::install_github('goldingn/greta')
 You will also need to install TensorFlow (version 1.0.0 or higher) before `greta` will work. Check [here](https://www.tensorflow.org/install/) for instructions on installing TensorFlow.
 
 ## Example
+
+Here I'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then I'll see how well `greta` does at recovering the original parameters. To begin, I'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
+
+```{r data_inits}
+NN <- 100
+TT <- 50
+MM <- 5
+```
+
 
 
