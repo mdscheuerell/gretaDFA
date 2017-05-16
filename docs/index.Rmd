@@ -56,6 +56,7 @@ You can install `greta` from GitHub using `devtools`
 
 ```{r, eval=FALSE}
 devtools::install_github('goldingn/greta')
+library(greta)
 ```
 
 You will also need to install TensorFlow (version 1.0.0 or higher) before `greta` will work. Check [here](https://www.tensorflow.org/install/) for instructions on installing TensorFlow.
@@ -70,5 +71,30 @@ TT <- 50
 MM <- 5
 ```
 
+### Simulate latent trends
 
+Next I'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, I make use of `mvrnorm` function in the `MASS` package. I also make use of the color palettes in `viridis`.
+
+```{r sim_trends, fig.height=4, fig.width=7}
+library(MASS)
+library(viridis)
+set.seed(123)
+## MM x TT matrix of innovations
+ww <- t(mvrnorm(TT, matrix(0,MM,1), diag(MM)))
+## MM x TT matrix of latent trends
+xx <- apply(ww,1,cumsum)
+## plot the trends
+par(mai=c(0.8,0.8,0.2,0.2))
+matplot(xx, type="b", lty="solid", cex=0.8,
+        xlab="Time", ylab=expression(italic(x)[italic(t)]),
+        col=plasma(MM, end=0.8))
+```
+
+### Create loading matrix
+
+The next thing to do is create the matrix $\mathbf{Z}$ that maps the trends onto the observations. I want some of the time series to look more like one another than others, so I use a range of values within some blocks.
+
+```{r create_Z}
+ZZ <- matrix(NA, NN, MM)
+```
 
