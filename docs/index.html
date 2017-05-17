@@ -229,7 +229,7 @@ div.tocify {
 \mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t
 \end{gathered}   
 \]</span></p>
-<p>The matrix <span class="math inline">\(\mathbf{Z}\)</span> maps the latent trends onto the observed data. The vector <span class="math inline">\(\mathbf{a}\)</span> contains time series specific offsets. The observation errors are mulitvaraite normal, such that <span class="math inline">\(\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})\)</span>. The form for <span class="math inline">\(\mathbf{R}\)</span> can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix <span class="math inline">\(\mathbf{Q}\)</span> of the process errors <span class="math inline">\(\mathbf{w}_t\)</span> governing the multivariate random walk is generally assumed to be an <span class="math inline">\(M \times M\)</span> identity matrix, <span class="math inline">\(\mathbf{I}_M\)</span>.</p>
+<p>The matrix <span class="math inline">\(\mathbf{Z}\)</span> maps the latent trends onto the observed data. The vector <span class="math inline">\(\mathbf{a}\)</span> contains time series specific offsets. The observation errors are mulitvaraite normal, such that <span class="math inline">\(\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})\)</span>. The form for <span class="math inline">\(\mathbf{R}\)</span> can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix <span class="math inline">\(\mathbf{Q}\)</span> of the process errors, where <span class="math inline">\(\mathbf{w}_t \sim \text{MVN}(\mathbf{0},\mathbf{Q})\)</span> governing the multivariate random walk is generally assumed to be an <span class="math inline">\(M \times M\)</span> identity matrix, <span class="math inline">\(\mathbf{I}_M\)</span>.</p>
 </div>
 <div id="why-greta" class="section level2">
 <h2>Why <code>greta</code>?</h2>
@@ -252,10 +252,11 @@ MM &lt;- 5</code></pre>
 <div id="simulate-latent-trends" class="section level3">
 <h3>Simulate latent trends</h3>
 <p>Next I’ll simulate the latent trends. In this case, each of them is random walk, so it’s easy to just work with the innovations. To do so, I make use of <code>mvrnorm</code> function in the <code>MASS</code> package. I also make use of the color palettes in <code>viridis</code>.</p>
-<p>I will discard the first 50 samples to eliminate the effects of the initial starting conditions.</p>
 <pre class="r"><code>library(MASS)
-library(viridis)
-set.seed(1234)
+library(viridis)</code></pre>
+<pre><code>## Loading required package: viridisLite</code></pre>
+<p>I will discard the first 50 samples to eliminate the effects of the initial starting conditions.</p>
+<pre class="r"><code>set.seed(1234)
 ## MM x TT matrix of innovations
 ww &lt;- t(mvrnorm(TT*2, matrix(0,MM,1), diag(MM)))
 ## MM x TT matrix of latent trends
@@ -305,8 +306,19 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, col=viridis(1,begin=0.4,end=0.4
 </div>
 <div id="parameter-estimation" class="section level2">
 <h2>Parameter estimation</h2>
+<p>One of the advantages of <code>greta</code> is that the model syntax looks just like native <code>R</code>. The basic container for data and parameters is the <code>greta_array</code>.</p>
 <pre class="r"><code>library(greta)</code></pre>
-<p>In addition, to make the model identifiable when <span class="math inline">\(M &gt; 1\)</span>, the upper right section of <span class="math inline">\(\mathbf{Z}\)</span> must be set equal to zero. For example, if <span class="math inline">\(M = 3\)</span>, then</p>
+<div id="specify-priors" class="section level3">
+<h3>Specify priors</h3>
+<p>The first thing to do is specify the prior distributions for the model parameters. Those for <span class="math inline">\(\mathbf{x}_0\)</span> (i.e., the state at time 0) and <span class="math inline">\(\mathbf{R}\)</span> are straightforward.</p>
+<pre class="r"><code>## initial state
+X0 &lt;- normal(0,10,MM)
+## var-cov matrix of obs errors
+RR_est &lt;- zeros(NN,NN)
+for(i in 1:NN) {
+  RR_est[i,i] &lt;- normal(0,10)
+}</code></pre>
+<p>However, the specification of <span class="math inline">\(\mathbf{Z}\)</span> is not as simple. To make the model identifiable when <span class="math inline">\(M &gt; 1\)</span>, the upper right section of <span class="math inline">\(\mathbf{Z}\)</span> must be set equal to zero. For example, if <span class="math inline">\(M = 3\)</span> and <span class="math inline">\(N = 5\)</span>, then</p>
 <p><span class="math display">\[
 \mathbf{Z} = 
 \begin{bmatrix}
@@ -317,6 +329,24 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, col=viridis(1,begin=0.4,end=0.4
     z_{51} &amp; z_{52} &amp; z_{53}
 \end{bmatrix}   
 \]</span></p>
+<p>Thus, we need to tell <code>greta</code> which of the parameters in <span class="math inline">\(\mathbf{Z}\)</span> are to be estimated, and which are set to 0. The order of operations is important here: <code>greta</code> does not allow you to reassign elements in an array to fixed values after they have already been declared as random.</p>
+<pre class="r"><code>## loadings matrix
+ZZ_est &lt;- zeros(NN,MM)
+for(i in 1:MM) {
+  ZZ_est[i:NN,i] &lt;- normal(0,10,NN-i+1)
+}</code></pre>
+</div>
+<div id="specify-likelihoods" class="section level3">
+<h3>Specify likelihoods</h3>
+<p>The next step is to set up the likelihood functions. To do so, <code>greta</code> requires a specification of the expectation for the mean and variance of the multivariate normal distributions. Specifically, in the DFA model the of interest distributions are</p>
+<p><span class="math display">\[
+\begin{gathered}
+\mathbf{y}_t \sim \text{MVN}(\mathbf{Z}\mathbf{x}_t,\mathbf{R}) \\
+\mathbf{x}_t \sim \text{MVN}(\mathbf{x}_{t-1},\mathbf{Q}) \\
+\mathbf{x}_0 \sim \text{MVN}(\mathbf{0},\mathbf{\infty})
+\end{gathered}
+\]</span></p>
+</div>
 </div>
 
 

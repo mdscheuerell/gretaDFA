@@ -27,7 +27,7 @@ $$
 \end{gathered}   
 $$
 
-The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The observation errors are mulitvaraite normal, such that $\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})$. The form for $\mathbf{R}$ can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors $\mathbf{w}_t$ governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$.
+The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The observation errors are mulitvaraite normal, such that $\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})$. The form for $\mathbf{R}$ can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors, where $\mathbf{w}_t \sim \text{MVN}(\mathbf{0},\mathbf{Q})$ governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$.
 
 ## Why `greta`?
 
@@ -61,11 +61,14 @@ MM <- 5
 
 Next I'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, I make use of `mvrnorm` function in the `MASS` package. I also make use of the color palettes in `viridis`.
 
+```{r load_pkgs}
+library(MASS)
+library(viridis)
+```
+
 I will discard the first `r TT` samples to eliminate the effects of the initial starting conditions.
 
 ```{r sim_trends, fig.height=4, fig.width=7, message=FALSE}
-library(MASS)
-library(viridis)
 set.seed(1234)
 ## MM x TT matrix of innovations
 ww <- t(mvrnorm(TT*2, matrix(0,MM,1), diag(MM)))
@@ -126,13 +129,27 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, col=viridis(1,begin=0.4,end=0.4
 
 ## Parameter estimation
 
-```{r, message=FALSE}
+One of the advantages of `greta` is that the model syntax looks just like native `R`. The basic container for data and parameters is the `greta_array`.
+
+```{r load_greta, message=FALSE}
 library(greta)
 ```
 
+### Specify priors
 
+The first thing to do is specify the prior distributions for the model parameters. Those for $\mathbf{x}_0$ (i.e., the state at time 0) and $\mathbf{R}$ are straightforward.
 
-In addition, to make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$, then 
+```{r priors_1}
+## initial state
+X0 <- normal(0,10,MM)
+## var-cov matrix of obs errors
+RR_est <- zeros(NN,NN)
+for(i in 1:NN) {
+  RR_est[i,i] <- normal(0,10)
+}
+```
+
+However, the specification of $\mathbf{Z}$ is not as simple. To make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$ and $N = 5$, then 
 
 $$
 \mathbf{Z} = 
@@ -144,3 +161,26 @@ $$
     z_{51} & z_{52} & z_{53}
 \end{bmatrix}   
 $$
+
+Thus, we need to tell `greta` which of the parameters in $\mathbf{Z}$ are to be estimated, and which are set to 0. The order of operations is important here: `greta` does not allow you to reassign elements in an array to fixed values after they have already been declared as random.
+
+```{r priors_2}
+## loadings matrix
+ZZ_est <- zeros(NN,MM)
+for(i in 1:MM) {
+  ZZ_est[i:NN,i] <- normal(0,10,NN-i+1)
+}
+```
+
+### Specify likelihoods
+
+The next step is to set up the likelihood functions. To do so, `greta` requires a specification of the expectation for the mean and variance of the multivariate normal distributions. Specifically, in the DFA model the of interest distributions are
+
+$$
+\begin{gathered}
+\mathbf{y}_t \sim \text{MVN}(\mathbf{Z}\mathbf{x}_t,\mathbf{R}) \\
+\mathbf{x}_t \sim \text{MVN}(\mathbf{x}_{t-1},\mathbf{Q}) \\
+\mathbf{x}_0 \sim \text{MVN}(\mathbf{0},\mathbf{\infty})
+\end{gathered}
+$$ 
+
