@@ -1,5 +1,5 @@
 ---
-title: "Using the `greta` package to do Dynamic Factor Analysis"
+title: "Using the `greta` package for Dynamic Factor Analysis"
 output:
   html_document:
     theme: cerulean
@@ -44,7 +44,7 @@ $$
 
 ## Why `greta`?
 
-Solving for the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [`MARSS`](https://cran.r-project.org/web/packages/MARSS/index.html) package, or an MCMC algorithm as implemented in the __Stan__ language via the [`statss`](https://github.com/nwfsc-timeseries/statss) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
+Estimating the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [`MARSS`](https://cran.r-project.org/web/packages/MARSS/index.html) package, or an MCMC algorithm as implemented in the __Stan__ language via the [`statss`](https://github.com/nwfsc-timeseries/statss) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
 
 For example, a couple of years ago I helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on daily growth rates of juvenile salmon. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with `MARSS` using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
 
@@ -59,7 +59,7 @@ devtools::install_github('goldingn/greta')
 library(greta)
 ```
 
-You will also need to install TensorFlow (version 1.0.0 or higher) before `greta` will work. Check [here](https://www.tensorflow.org/install/) for instructions on installing TensorFlow.
+__NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) before `greta` will work. Check [here](https://www.tensorflow.org/install/) for instructions.
 
 ## Example
 
@@ -73,28 +73,58 @@ MM <- 5
 
 ### Simulate latent trends
 
-Next I'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, I make use of `mvrnorm` function in the `MASS` package. I also make use of the color palettes in `viridis`.
+Next I'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, I make use of `mvrnorm` function in the `MASS` package. I also make use of the color palettes in `viridis`. I will also discard the first `r TT` samples in order to eliminate the effects of the initial starting conditions.
 
-```{r sim_trends, fig.height=4, fig.width=7}
+```{r sim_trends, fig.height=4, fig.width=7, message=FALSE}
 library(MASS)
 library(viridis)
-set.seed(123)
+set.seed(1234)
 ## MM x TT matrix of innovations
-ww <- t(mvrnorm(TT, matrix(0,MM,1), diag(MM)))
+ww <- t(mvrnorm(TT*2, matrix(0,MM,1), diag(MM)))
 ## MM x TT matrix of latent trends
-xx <- apply(ww,1,cumsum)
+xx <- t(apply(ww[,-(1:TT)],1,cumsum))
 ## plot the trends
 par(mai=c(0.8,0.8,0.2,0.2))
-matplot(xx, type="b", lty="solid", cex=0.8,
+matplot(t(xx), type="b", lty="solid", cex=0.8,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
 ```
 
-### Create loading matrix
+### Create loadings matrix
 
-The next thing to do is create the matrix $\mathbf{Z}$ that maps the trends onto the observations. I want some of the time series to look more like one another than others, so I use a range of values within some blocks.
+The next thing to do is create the matrix $\mathbf{Z}$ that maps the trends onto the observations. I want some of the time series to look more like one another than others, so I'll use a range of values within some blocks.
 
 ```{r create_Z}
 ZZ <- matrix(NA, NN, MM)
+LL <- seq(0,1,length.out=6)
+for(i in 1:MM) {
+  zz <- NULL
+  for(j in 1:(MM)) {
+    zz <- c(zz,runif(NN/MM,LL[j],LL[j+1]))
+  }
+  ZZ[sample(NN,NN),i] <- zz
+}
 ```
+
+### Create observation errors
+
+Now I need to create the observation errors to add to the time series. For this first test, I'll assume that the errors are IID, and their variance is 0.2.
+
+```{r create_obs_errs}
+vv <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
+```
+
+### Create time series
+
+Now I can use the loadings matrix and observation errors to create the observed time series. For now I will ignore the additive effect of the offset vector $\mathbf{a}$.
+
+```{r create_ts}
+yy <- ZZ %*% xx + vv
+## plot the trends
+par(mai=c(0.8,0.8,0.2,0.2))
+matplot(t(yy), type="l", lty="solid",
+        xlab="Time", ylab=expression(italic(y)[italic(t)]),
+        col=plasma(NN, end=0.8))
+```
+
 
