@@ -29,19 +29,6 @@ $$
 
 The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The observation errors are mulitvaraite normal, such that $\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})$. The form for $\mathbf{R}$ can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors $\mathbf{w}_t$ governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$.
 
-In addition, to make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$, then 
-
-$$
-\mathbf{Z} = 
-\begin{bmatrix}
-    z_{11} & 0      & 0 \\
-    z_{21} & z_{22} & 0 \\
-    z_{31} & z_{32} & z_{33} \\
-    z_{41} & z_{42} & z_{43} \\
-    z_{51} & z_{52} & z_{53}
-\end{bmatrix}   
-$$
-
 ## Why `greta`?
 
 Estimating the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [`MARSS`](https://cran.r-project.org/web/packages/MARSS/index.html) package, or an MCMC algorithm as implemented in the __Stan__ language via the [`statss`](https://github.com/nwfsc-timeseries/statss) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
@@ -96,7 +83,7 @@ The next thing to do is create the matrix $\mathbf{Z}$ that maps the trends onto
 
 ```{r create_Z}
 ZZ <- matrix(NA, NN, MM)
-LL <- seq(0,1,length.out=6)
+LL <- seq(0,0.8,length.out=6)
 for(i in 1:MM) {
   zz <- NULL
   for(j in 1:(MM)) {
@@ -118,7 +105,7 @@ vv <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
 
 Now I can use the loadings matrix and observation errors to create the observed time series. For now I will ignore the additive effect of the offset vector $\mathbf{a}$.
 
-```{r create_ts}
+```{r create_ts, fig.height=4, fig.width=7}
 yy <- ZZ %*% xx + vv
 ## plot the trends
 par(mai=c(0.8,0.8,0.2,0.2))
@@ -127,4 +114,25 @@ matplot(t(yy), type="l", lty="solid",
         col=plasma(NN, end=0.8))
 ```
 
+This collection of `r NN` time series appears to be highly correlated. Here is a histogram of the correlation coefficients. 
 
+```{r hist_cor_coefs, fig.height=4, fig.width=7}
+par(mai=c(0.8,0.8,0.2,0.2))
+hist(cor(yy)[lower.tri(yy)], breaks=seq(-10,10)/10,
+     xlab="Correlation", ylab="", main="")
+```
+
+## Parameter estimation
+
+In addition, to make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$, then 
+
+$$
+\mathbf{Z} = 
+\begin{bmatrix}
+    z_{11} & 0      & 0 \\
+    z_{21} & z_{22} & 0 \\
+    z_{31} & z_{32} & z_{33} \\
+    z_{41} & z_{42} & z_{43} \\
+    z_{51} & z_{52} & z_{53}
+\end{bmatrix}   
+$$
