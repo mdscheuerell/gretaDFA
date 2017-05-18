@@ -18,16 +18,19 @@ _Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fish
 
 ## Background
 
-Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden" temporal trends, where $N >> M$. For an $N \times T$ matrix $\mathbf{y}$, the DFA model is
+Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden" temporal trends, where $N >> M$. For an $N \times T$ matrix $\mathbf{y}$, the DFA model (ignoring any covaraite effects) is
 
 $$
-\begin{gathered}
-\mathbf{y}_t = \mathbf{Z}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t \\
-\mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t
-\end{gathered}   
+\mathbf{y}_t \sim \text{MVN}(\mathbf{Z} \mathbf{x}_t + \mathbf{a},\mathbf{R})
+$$
+$$
+\mathbf{x}_t \sim \text{MVN}(\mathbf{x}_{t-1},\mathbf{Q})
+$$
+$$
+\mathbf{x}_0 \sim \text{MVN}(\mathbf{0},\mathbf{Q}_0)
 $$
 
-The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The observation errors are mulitvaraite normal, such that $\mathbf{v}_t \sim \text{MVN}(\mathbf{0},\mathbf{R})$. The form for $\mathbf{R}$ can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors, where $\mathbf{w}_t \sim \text{MVN}(\mathbf{0},\mathbf{Q})$ governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$.
+The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The variance-covariance matrix $\mathbf{R}$ of the observation errors can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errorsgoverning the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$. The variance-covariance matrix $\mathbf{Q}_0$ of the initial states $\mathbf{x}_0$ is typically assumed to have large values along the diagonal and zeros elsewhere.
 
 ## Why `greta`?
 
@@ -39,10 +42,16 @@ The [`greta`](https://github.com/goldingn/greta) package was designed by [Nick G
 
 ## Installation
 
-You can install `greta` from GitHub using `devtools`
+You can install `greta` from GitHub using `devtools`. The stable release is here:
 
 ```{r, eval=FALSE, message=FALSE}
 devtools::install_github('goldingn/greta')
+```
+
+For this vignette, I'm using the the development version, which you can find here:
+
+```{r, eval=FALSE, message=FALSE}
+devtools::install_github('goldingn/greta@dev')
 ```
 
 __NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) before `greta` will work. Check [here](https://www.tensorflow.org/install/) for instructions.
@@ -118,7 +127,7 @@ matplot(t(yy), type="l", lty="solid",
         col=plasma(NN, alpha=0.7, end=0.8))
 ```
 
-Although many of the time series in this collection of `r NN` time series do not appear to be highly correlated, some of them are by definition. Here is a histogram of the correlation coefficients for all of the pairwise comparisons. 
+It's hard to tell from this plot how many of the `r NN` time series are correlated. Here is a histogram of the correlation coefficients for all of the pairwise comparisons. 
 
 ```{r hist_cor_coefs, fig.height=4, fig.width=7}
 rho <- cor(yy)
@@ -149,20 +158,22 @@ for(i in 1:NN) {
 }
 ```
 
-However, the specification of $\mathbf{Z}$ is not as simple. To make the model identifiable when $M > 1$, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M = 3$ and $N = 5$, then 
+However, the specification of $\mathbf{Z}$ is not as simple. To make the model identifiable when $M$ > 1, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 and $N$ = 7, then 
 
 $$
 \mathbf{Z} = 
 \begin{bmatrix}
-    z_{11} & 0      & 0 \\
-    z_{21} & z_{22} & 0 \\
-    z_{31} & z_{32} & z_{33} \\
-    z_{41} & z_{42} & z_{43} \\
-    z_{51} & z_{52} & z_{53}
+    z_{11} & 0      & 0 & 0 \\
+    z_{21} & z_{22} & 0 & 0 \\
+    z_{31} & z_{32} & z_{33} & 0 \\
+    z_{41} & z_{42} & z_{43} & z_{44} \\
+    z_{51} & z_{52} & z_{53} & z_{54} \\
+    z_{61} & z_{62} & z_{63} & z_{64} \\
+    z_{71} & z_{72} & z_{73} & z_{74} 
 \end{bmatrix}   
 $$
 
-Thus, we need to tell `greta` which of the parameters in $\mathbf{Z}$ are to be estimated, and which are set to 0. The order of operations is important here: `greta` does not allow you to reassign elements in an array to fixed values after they have already been declared as random.
+Thus, we need to tell `greta` which of the parameters in $\mathbf{Z}$ are to be estimated, and which are set to 0. The order of operations is important here; `greta` does not allow you to reassign elements in an array to fixed values after they have already been declared as random.
 
 ```{r priors_2}
 ## loadings matrix
@@ -170,17 +181,13 @@ ZZ_est <- zeros(NN,MM)
 for(i in 1:MM) {
   ZZ_est[i:NN,i] <- normal(0,10,NN-i+1)
 }
+## inspect the top of ZZ_est
+head(ZZ_est)
 ```
 
 ### Specify likelihoods
 
-The next step is to set up the likelihood functions. To do so, `greta` requires a specification of the expectation for the mean and variance of the multivariate normal distributions. Specifically, in the DFA model the of interest distributions are
+The next step is to set up the likelihood functions. To do so, `greta` requires a specification of the expectation for the mean and variance of the multivariate normal distributions.
 
-$$
-\begin{gathered}
-\mathbf{y}_t \sim \text{MVN}(\mathbf{Z}\mathbf{x}_t,\mathbf{R}) \\
-\mathbf{x}_t \sim \text{MVN}(\mathbf{x}_{t-1},\mathbf{Q}) \\
-\mathbf{x}_0 \sim \text{MVN}(\mathbf{0},\mathbf{\infty})
-\end{gathered}
-$$ 
+
 
