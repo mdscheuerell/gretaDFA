@@ -61,7 +61,7 @@ MM <- 5
 
 Next I'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, I make use of `mvrnorm` function in the `MASS` package. I also make use of the color palettes in `viridis`.
 
-```{r load_pkgs}
+```{r load_pkgs, message=FALSE}
 library(MASS)
 library(viridis)
 ```
