@@ -13,12 +13,14 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+***
+
 [__Mark D. Scheuerell__](https://faculty.washington.edu/scheuerl/)  
 _Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA, mark.scheuerell@noaa.gov_
 
 ## Background
 
-Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden" temporal trends, where $N >> M$. For an $N \times T$ matrix $\mathbf{y}$, the DFA model (ignoring any covaraite effects) is
+Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden" temporal trends, where $N >> M$. For an $N \times T$ matrix $\mathbf{y}$, the DFA model (ignoring any covariate effects) is
 
 $$
 \mathbf{y}_t \sim \text{MVN}(\mathbf{Z} \mathbf{x}_t + \mathbf{a},\mathbf{R})
@@ -30,7 +32,7 @@ $$
 \mathbf{x}_0 \sim \text{MVN}(\mathbf{0},\mathbf{Q}_0)
 $$
 
-The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The variance-covariance matrix $\mathbf{R}$ of the observation errors can be anything from simple IID errors (i.e., same variance parameter down the diagonal ans zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errorsgoverning the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$. The variance-covariance matrix $\mathbf{Q}_0$ of the initial states $\mathbf{x}_0$ is typically assumed to have large values along the diagonal and zeros elsewhere.
+The matrix $\mathbf{Z}$ maps the latent trends onto the observed data. The vector $\mathbf{a}$ contains time series specific offsets. The variance-covariance matrix $\mathbf{R}$ of the observation errors can be anything from simple IID errors (i.e., same variance parameter down the diagonal and zeroes elsewhere), to something much more complex like an unconstrained block diagonal. For convenience, the variance-covariance matrix $\mathbf{Q}$ of the process errors governing the multivariate random walk is generally assumed to be an $M \times M$ identity matrix, $\mathbf{I}_M$. The variance-covariance matrix $\mathbf{Q}_0$ of the initial states $\mathbf{x}_0$ is typically assumed to have large values along the diagonal and zeros elsewhere.
 
 ## Why `greta`?
 
@@ -132,7 +134,7 @@ It's hard to tell from this plot how many of the `r NN` time series are correlat
 ```{r hist_cor_coefs, fig.height=4, fig.width=7}
 rho <- cor(yy)
 par(mai=c(0.8,0.8,0.2,0.2))
-hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, col=viridis(1,begin=0.4,end=0.4),
+hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, col=plasma(1,begin=0.7,end=0.7),
      xlab="Correlation", ylab="", main="")
 ```
 
