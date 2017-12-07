@@ -165,7 +165,7 @@ op <- greta::.internals$nodes$constructors$op
 ## cumsums across matrix rows
 cumsum_row <- function(x) {
   stopifnot(length(dim(x)) == 2)
-  op("row_cumsum",
+  op("cumsum_row",
      x,
      tf_operation = tf$cumsum,
      operation_args = list(axis = 1L))
@@ -173,6 +173,12 @@ cumsum_row <- function(x) {
 ```
 
 One of the advantages of __greta__ is that the model syntax looks just like native `R`. The basic container for data and parameters is the `greta_array`.
+
+```{r func_test}
+testmat <- normal(0, 1, dim = c(2, 3))
+y_row <- cumsum_row(testmat)
+evaluate(y_row, list(testmat = matrix(1, 2, 3)))
+```
 
 ## Specify priors
 
@@ -242,7 +248,7 @@ xx_est <- cumsum_row(xx_est)
 
 Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.
 
-```{r like_obs}
+```{r like_obs, eval=FALSE}
 CC <- chol(RR_est)
 vv <- normal(0, 1, NN)
 yy <- ZZ_est %*% xx_est + CC %*% vv
