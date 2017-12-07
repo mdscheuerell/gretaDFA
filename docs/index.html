@@ -307,23 +307,26 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10,
 </div>
 <div id="parameter-estimation-via-greta" class="section level1">
 <h1>Parameter estimation via <strong>greta</strong></h1>
-<p>We begin by loading <strong>greta</strong> and defining a function that returns the cumulative sum of the rows of a matrix that we will need for estimating the latent states <span class="math inline">\((\mathbf{x})\)</span>.</p>
-<pre class="r"><code>library(greta)
+<p>We begin by loading the <strong>tensorflow</strong> and <strong>greta</strong> packages, and defining a function that returns the cumulative sum of the rows of a matrix that we will need for estimating the latent states <span class="math inline">\((\mathbf{x})\)</span>.</p>
+<pre class="r"><code>library(tensorflow)
+library(greta)
 op &lt;- greta::.internals$nodes$constructors$op
-## cumsums across matrix rows
-cumsum_row &lt;- function(x) {
+cumsum_mat &lt;- function(x, a=1L) {
+  ## cumsums across matrix rows/cols
+  ## rows: a = 1L
+  ## cols: a = 0L
   stopifnot(length(dim(x)) == 2)
-  op(&quot;row_cumsum&quot;,
+  op(&quot;cumsum_mat&quot;,
      x,
      tf_operation = tf$cumsum,
-     operation_args = list(axis = 1L))
+     operation_args = list(axis = a))
 }</code></pre>
 <p>One of the advantages of <strong>greta</strong> is that the model syntax looks just like native <code>R</code>. The basic container for data and parameters is the <code>greta_array</code>.</p>
 <div id="specify-priors" class="section level2">
 <h2>Specify priors</h2>
 <p>The first thing to do is specify the prior distributions for the model parameters. We begin with the initial states <span class="math inline">\(\mathbf{x}_0\)</span>, which we assume are each drawn from diffuse normal with mean 0 and standard deviation of 10.</p>
 <pre class="r"><code>## initial state
-X0 &lt;- normal(0, 10, MM)</code></pre>
+x0 &lt;- normal(0, 10, MM)</code></pre>
 <p>Defining the priors for the covariance matrix <span class="math inline">\(\mathbf{R}\)</span> is straightforward as well. We’ll use a relatively uninformative half-cauchy prior on the variances with a scale of 25 and truncate the upper end at 100.</p>
 <pre class="r"><code>## cov matrix of obs errors
 RR_est &lt;- as_data(diag(NN))
@@ -363,6 +366,15 @@ head(tmp)</code></pre>
 <div id="specify-likelihoods" class="section level2">
 <h2>Specify likelihoods</h2>
 <p>The next step is to set up the likelihood functions. To do so, <strong>greta</strong> requires a specification of the expectation for the mean and variance of the multivariate normal distributions.</p>
+<p>For the factor model, we need a way to estimate the temporal evolution of the random walks. This is where we can take advantage of the <code>cumsum_row()</code> function we defined above. Also recall that we defined the covariance matrix <span class="math inline">\(\mathbf{Q}\)</span> to be the identity matrix <span class="math inline">\(\mathbf{I}\)</span>.</p>
+<pre class="r"><code>## begin with factors as matrix of innovations
+xx_est &lt;- normal(0, 1, c(MM, TT))
+## cumsum over rows for the random walk
+xx_est &lt;- cumsum_mat(xx_est)</code></pre>
+<p>Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.</p>
+<pre class="r"><code>CC &lt;- chol(RR_est)
+vv &lt;- normal(0, 1, c(NN,TT))
+yy &lt;- ZZ_est %*% xx_est + CC %*% vv</code></pre>
 </div>
 </div>
 

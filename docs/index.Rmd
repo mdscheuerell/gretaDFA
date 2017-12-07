@@ -157,28 +157,25 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10,
 
 # Parameter estimation via __greta__
 
-We begin by loading __greta__ and defining a function that returns the cumulative sum of the rows of a matrix that we will need for estimating the latent states $(\mathbf{x})$.
+We begin by loading the __tensorflow__ and __greta__ packages, and defining a function that returns the cumulative sum of the rows of a matrix that we will need for estimating the latent states $(\mathbf{x})$.
 
 ```{r load_greta, message=FALSE}
+library(tensorflow)
 library(greta)
 op <- greta::.internals$nodes$constructors$op
-## cumsums across matrix rows
-cumsum_row <- function(x) {
+cumsum_mat <- function(x, a=1L) {
+  ## cumsums across matrix rows/cols
+  ## rows: a = 1L
+  ## cols: a = 0L
   stopifnot(length(dim(x)) == 2)
-  op("cumsum_row",
+  op("cumsum_mat",
      x,
      tf_operation = tf$cumsum,
-     operation_args = list(axis = 1L))
+     operation_args = list(axis = a))
 }
 ```
 
 One of the advantages of __greta__ is that the model syntax looks just like native `R`. The basic container for data and parameters is the `greta_array`.
-
-```{r func_test}
-testmat <- normal(0, 1, dim = c(2, 3))
-y_row <- cumsum_row(testmat)
-evaluate(y_row, list(testmat = matrix(1, 2, 3)))
-```
 
 ## Specify priors
 
@@ -243,14 +240,14 @@ For the factor model, we need a way to estimate the temporal evolution of the ra
 ## begin with factors as matrix of innovations
 xx_est <- normal(0, 1, c(MM, TT))
 ## cumsum over rows for the random walk
-xx_est <- cumsum_row(xx_est)
+xx_est <- cumsum_mat(xx_est)
 ```
 
 Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.
 
-```{r like_obs, eval=FALSE}
+```{r like_obs, eval=TRUE}
 CC <- chol(RR_est)
-vv <- normal(0, 1, NN)
+vv <- normal(0, 1, c(NN,TT))
 yy <- ZZ_est %*% xx_est + CC %*% vv
 ```
 
