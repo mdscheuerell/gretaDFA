@@ -71,7 +71,7 @@ Here we'll create a large number of time series that share some interdependencie
 ```{r data_inits}
 NN <- 100
 TT <- 50
-MM <- 5
+MM <- 4
 ```
 
 ## Simulate latent trends
@@ -124,7 +124,7 @@ for(i in 1:MM) {
 Now we need to create the observation errors to add to the time series. For this first test, we'll assume that the errors are IID, and their variance is 0.2.
 
 ```{r create_obs_errs}
-vv <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
+ee <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
 ```
 
 ## Create observed time series
@@ -133,7 +133,7 @@ Now we can use the loadings matrix and observation errors to create the observed
 
 ```{r create_ts}
 ## observed data
-yy <- ZZ %*% xx + vv
+yy <- ZZ %*% xx + ee
 ```
 
 ```{r plot_ts, fig.height=4, fig.width=7, echo=FALSE}
@@ -145,8 +145,8 @@ matplot(t(yy), type="l", lty="solid",
 
 It's hard to tell from this plot how many of the `r NN` time series are correlated. Here is a histogram of the correlation coefficients for all of the pairwise comparisons. 
 
-```{r hist_cor_coefs, fig.height=4, fig.width=7}
-rho <- cor(yy)
+```{r hist_cor_coefs, fig.height=4, fig.width=7, echo=FALSE}
+rho <- cor(t(yy))
 par(mai=c(0.8,0.8,0.2,0.2))
 hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10,
      col=plasma(1,begin=0.5,end=0.5), border="white",
@@ -243,11 +243,32 @@ xx_est <- normal(0, 1, c(MM, TT))
 xx_est <- cumsum_mat(xx_est)
 ```
 
-Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.
+
+### Option 1
+
+This is the slower, naive way.
 
 ```{r like_obs, eval=TRUE}
-CC <- chol(RR_est)
-vv <- normal(0, 1, c(NN,TT))
-yy <- ZZ_est %*% xx_est + CC %*% vv
+yy <- as_data(yy)
+yy[1:5,1:5]
+for(t in 1:TT) {
+  distribution(yy[,t]) = multivariate_normal(ZZ_est %*% xx_est[,t], RR_est)
+}
 ```
 
+### Option 2
+
+Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.
+
+```{r like_obs_2, eval=FALSE}
+CC <- chol(RR_est)
+vv <- normal(0, 1, c(NN,TT))
+yy_est <- ZZ_est %*% xx_est + CC %*% vv
+```
+
+Now we can define the complete model.
+
+```{r greta_model}
+#mod <- model(xx_est)
+#mcmc(mod, n_samples=10)
+```
