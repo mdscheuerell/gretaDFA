@@ -268,7 +268,7 @@ yy_est <- ZZ_est %*% xx_est + CC %*% vv
 
 Now we can define the complete model.
 
-```{r greta_model}
-#mod <- model(xx_est)
-#mcmc(mod, n_samples=10)
+```{r greta_model, eval=FALSE}
+mod <- model(xx_est)
+mcmc(mod, n_samples=10)
 ```
