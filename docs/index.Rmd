@@ -15,7 +15,7 @@ options(tensorflow.one_based_extract = TRUE)
 ```
 
 [__Mark D. Scheuerell__](https://faculty.washington.edu/scheuerl/)  
-_Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA, mark.scheuerell@noaa.gov_
+_Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fisheries Service, National Oceanic and Atmospheric Administration, Seattle, WA USA_
 
 [__Nick Golding__](https://qaeco.com/researchfellows/#ngolding)  
 _Quantitative and Applied Ecology Group, School of BioSciences, University of Melbourne, Melbourne, AUS_
@@ -69,8 +69,8 @@ __NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) bef
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. To begin, we'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 100
-TT <- 50
+NN <- 12
+TT <- 20
 MM <- 4
 ```
 
@@ -119,19 +119,13 @@ for(i in 1:MM) {
 }
 ```
 
-## Create observation errors
-
-Now we need to create the observation errors to add to the time series. For this first test, we'll assume that the errors are IID, and their variance is 0.2.
-
-```{r create_obs_errs}
-ee <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
-```
-
 ## Create observed time series
 
-Now we can use the loadings matrix and observation errors to create the observed time series. For now we will ignore the additive effect of the offset vector $\mathbf{a}$. (We note here, too, that one could always subtract the mean of each of the $N$ time errors from $\mathbf{y}$ and thereby avoid having to estimate $\mathbf{a}$.)
+Now we can use the loadings matrix and some observation errors to create the observed time series. Here we'll assume that the errors are IID, and their variance is 0.2. For now we will ignore the additive effect of the offset vector $\mathbf{a}$. (We note here, too, that one could always subtract the mean of each of the $N$ time errors from $\mathbf{y}$ and thereby avoid having to estimate $\mathbf{a}$.)
 
 ```{r create_ts}
+## obs errors
+ee <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
 ## observed data
 yy <- ZZ %*% xx + ee
 ```
@@ -179,16 +173,9 @@ One of the advantages of __greta__ is that the model syntax looks just like nati
 
 ## Specify priors
 
-The first thing to do is specify the prior distributions for the model parameters. We begin with the initial states $\mathbf{x}_0$, which we assume are each drawn from diffuse normal with mean 0 and standard deviation of 10.
+The first thing to do is specify the prior distributions for the model parameters. Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. We'll use a relatively uninformative half-cauchy prior on the variances with a scale of 25 and truncate the upper end at 100.
 
-```{r priors_on_states}
-## initial state
-x0 <- normal(0, 10, MM)
-```
-
-Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward as well. We'll use a relatively uninformative half-cauchy prior on the variances with a scale of 25 and truncate the upper end at 100.
-
-```{r priors_1}
+```{r priors_obs_cov}
 ## cov matrix of obs errors
 RR_est <- as_data(diag(NN))
 diag(RR_est) <- cauchy(0, 25, NN, truncation=c(0, 100))
@@ -211,7 +198,7 @@ $$
 
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which are set to 0. The order of operations is important here; __greta__ does not allow you to reassign elements in an array to fixed values after they have already been declared as random.
 
-```{r priors_2}
+```{r priors_loadings}
 ## loadings matrix
 ZZ_est <- zeros(NN,MM)
 idx <- lower.tri(ZZ_est, diag = TRUE)
@@ -243,32 +230,31 @@ xx_est <- normal(0, 1, c(MM, TT))
 xx_est <- cumsum_mat(xx_est)
 ```
 
+Here is the likelihood for the data.
 
-### Option 1
-
-This is the slower, naive way.
-
-```{r like_obs, eval=TRUE}
-yy <- as_data(yy)
-yy[1:5,1:5]
-for(t in 1:TT) {
-  distribution(yy[,t]) = multivariate_normal(ZZ_est %*% xx_est[,t], RR_est)
-}
+```{r like_obs}
+## vectorize data
+yy_vec <- as_data(matrix(yy, 1, NN*TT))
+## vectorize mean
+Zx_vec <- ZZ_est %*% xx_est
+dim(Zx_vec) <- c(NN*TT, 1)
+## create expanded cov matrix
+RR_vec <- as_data(diag(NN*TT))
+diag(RR_vec) <- rep(diag(RR_est),TT)
+## define likelihood
+distribution(yy_vec) = multivariate_normal(Zx_vec, RR_vec)
 ```
 
-### Option 2
+Now we can define the complete model and do some MCMC sampling.
 
-Beginning with the observation model, we will use a Cholesky decomposition to more effectively sample the covariance parameters.
-
-```{r like_obs_2, eval=FALSE}
-CC <- chol(RR_est)
-vv <- normal(0, 1, c(NN,TT))
-yy_est <- ZZ_est %*% xx_est + CC %*% vv
+```{r greta_model, cache=TRUE}
+mod <- model(xx_est, ZZ_est, RR_est)
+mcmc_smpl <- mcmc(mod, n_samples=10)
 ```
 
-Now we can define the complete model.
+# Examining the fits
 
-```{r greta_model, eval=FALSE}
-mod <- model(xx_est)
-mcmc(mod, n_samples=10)
+```{r examine_fits}
+smry <- summary(mcmc_smpl)
+smry$statistics[,"Mean"]
 ```
