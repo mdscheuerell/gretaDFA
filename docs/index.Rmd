@@ -1,5 +1,5 @@
 ---
-title: "Dynamic Factor Analysis with __greta__"
+title: "Dynamic Factor Analysis with the __greta__ package for __R__"
 output:
   html_document:
     theme: cerulean
@@ -28,7 +28,7 @@ __WARNING__: This vignette is still in the testing and evaluating phase and shou
 
 # Background
 
-Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden", time-varying factors, where $M \ll N$. For an $N \times T$ matrix of data $\mathbf{y}$, where $\mathbf{y}_t$ is an $N \times 1$ column vector, the DFA model (ignoring any covaraite effects) is
+Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden", time-varying factors, where $M \ll N$. For an $N \times T$ matrix of data $\mathbf{y}$, where $\mathbf{y}_t$ is an $N \times 1$ column vector, the DFA model is
 
 $$
 \mathbf{y}_t \sim \text{MVN}(\mathbf{Z} \mathbf{x}_t + \mathbf{a},\mathbf{R})
@@ -48,7 +48,7 @@ The factors are modeled as random walks where the covariance matrix $\mathbf{Q}$
 
 Estimating the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [__MARSS__](https://cran.r-project.org/web/packages/MARSS/index.html) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
 
-For example, a couple of years ago MDS helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on estimates of daily growth rates for juvenile Chinook salmon. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with __MARSS__ using a distributed cluster from [Domino](https://www.dominodatalab.com/), and the models still took days to converge.
+For example, a couple of years ago MDS helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on estimates of daily growth rates for juvenile Chinook salmon. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with __MARSS__ using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
 
 The [__greta__](https://github.com/goldingn/greta) package was designed by NG to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal `R` syntax.
 
@@ -75,14 +75,14 @@ __NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) bef
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. To begin, we'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 6
+NN <- 8
 TT <- 30
-MM <- 1
+MM <- 2
 ```
 
 ## Simulate latent trends
 
-Next we'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, we make use of `mvrnorm` function in the `MASS` package. We also make use of the color palettes in `viridis`.
+Next we'll simulate the latent trends. In this case, each of them is random walk, so it's easy to just work with the innovations. To do so, we make use of `mvrnorm()` function in the __MASS__ package. We also make use of the color palettes in the __viridis__ package.
 
 ```{r load_pkgs, message=FALSE}
 library(MASS)
@@ -124,7 +124,8 @@ for(i in 1:MM) {
   ZZ[sample(NN,NN),i] <- round(zz,3)
 }
 
-ZZ <- matrix(1, NN, MM)
+ZZ <- matrix(0, NN, MM)
+ZZ[1:NN+NN/2] <- 1
 ```
 
 ## Create observed time series
@@ -181,13 +182,9 @@ One of the advantages of __greta__ is that the model syntax looks just like nati
 
 ## Specify priors
 
-The first thing to do is specify the prior distributions for the model parameters. Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. We'll use a relatively uninformative half-cauchy prior on the variances with a scale of 25 and truncate the upper end at 100.
+The first thing to do is specify the prior distributions for the model parameters. 
 
-```{r priors_obs_cov}
-## cov matrix of obs errors
-RR_est <- as_data(diag(NN))
-diag(RR_est) <- cauchy(0, 5, NN, truncation=c(0, 20))
-```
+### Loadings matrix
 
 However, the specification of $\mathbf{Z}$ is not as simple. To make the model identifiable when $M$ > 1, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 then 
 
@@ -225,39 +222,54 @@ head(tmp)
 
 It looks like everything worked as expected.
 
+### Covariance matrix
+
+Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. We'll use a relatively uninformative half-cauchy prior on the variances with a scale of 25 and truncate the upper end at 100.
+
+```{r priors_obs_cov}
+## empty R
+RR_est <- zeros(NN,NN)
+## diagonal of R
+RR_est_raw <- cauchy(0, 1, NN, truncation=c(0, 5))
+diag(RR_est) <- RR_est_raw
+```
+
 ## Specify likelihoods
 
 The next step is to set up the likelihood functions. To do so, __greta__ requires a specification of the expectation for the mean and variance of the multivariate normal distributions.
 
-For the factor model, we need a way to estimate the temporal evolution of the random walks. This is where we can take advantage of the `cumsum_row()` function we defined above. Also recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.
+For the factor model, we need a way to estimate the temporal evolution of the random walks. This is where we can take advantage of the `cumsum_mat()` function we defined above. Also recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.
 
 ```{r like_factors}
-## begin with factors as matrix of innovations
-xx_est <- normal(0, 1, c(MM, TT))
-## cumsum over rows for the random walk
-xx_est <- cumsum_mat(xx_est)
+## inital factor
+X0 <- normal(0, 10, c(MM, 1))
+## factors 2-TT
+XX <- normal(0, 1, c(MM, TT))
+## combine & cumsum over rows for the random walk
+xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
 ```
 
-Here is the likelihood for the data.
-
-```{r like_obs}
+```{r like_obs, eval=TRUE, echo=TRUE}
 ## vectorize data
 yy_vec <- as_data(matrix(yy, 1, NN*TT))
 ## vectorize mean
-Zx_vec <- ZZ_est %*% xx_est
-dim(Zx_vec) <- c(NN*TT, 1)
+#Zx_vec <- ZZ_est %*% xx_est
+Zx_vec <- c(ZZ %*% xx_est)
 ## create expanded cov matrix
-RR_vec <- as_data(diag(NN*TT))
-diag(RR_vec) <- rep(diag(RR_est),TT)
+RR_vec <- zeros(NN*TT, NN*TT)
+diag(RR_vec) <- rep(RR_est_raw, TT)
 ## define likelihood
 distribution(yy_vec) = multivariate_normal(Zx_vec, RR_vec)
 ```
 
+## Fit the model
+
 Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
-mod_fit <- model(xx_est, ZZ_est, RR_est)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 100, thin = 1, warmup = 100,
+#mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
+mod_fit <- model(xx_est, RR_est_raw)
+mcmc_smpl <- mcmc(mod_fit, n_samples = 300, thin = 1, warmup = 500,
                   chains = 1, verbose = FALSE)
 ```
 
@@ -268,25 +280,12 @@ mod_smry <- summary(mcmc_smpl)
 fff <- mod_smry$statistics[,"Mean"]
 ```
 
-Here are the `r MM` factors.
+Here are the `r MM` factors $\mathbf{x}$.
 
 ```{r get_factors}
-
-ZZ_fit <- fff[grepl("ZZ",rownames(mod_smry$statistics))]
-ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
-ZZ_fit
-#HH_inv <- varimax(ZZ_fit)$rotmat
-#ZZ_rot <- ZZ_fit %*% HH_inv
-#ZZ_rot
-
 xx_fit <- fff[grepl("xx",rownames(mod_smry$statistics))]
 xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
-# xx_fit <- xx_fit - apply(xx_fit, 1, mean)
 #xx_rot <- solve(HH_inv) %*% xx_fit
-
-RR_fit <- fff[grepl("RR",rownames(mod_smry$statistics))]
-RR_fit <- matrix(RR_fit, NN, NN, byrow=FALSE)
-RR_fit
 ```
 
 
@@ -297,10 +296,32 @@ matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
         col=plasma(MM, end=0.8))
 ```
 
+and the loadings matrix $\mathbf{Z}$.
+
+```{r get_ZZ_fit}
+
+#ZZ_fit <- fff[grepl("ZZ",rownames(mod_smry$statistics))]
+#ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+#ZZ_fit
+#HH_inv <- varimax(ZZ_fit)$rotmat
+#ZZ_rot <- ZZ_fit %*% HH_inv
+#ZZ_rot
+
+```
+
+and the covariance matrix $\mathbf{R}$.
+
+```{r get_RR_fit}
+RR_fit <- fff[grepl("RR",rownames(mod_smry$statistics))]
+RR_fit <- diag(RR_fit)
+round(RR_fit, 2)
+```
+
 Here are the expectations.
 
 ```{r get_yy_fits}
-yy_fit <- ZZ_fit %*% xx_fit
+#yy_fit <- ZZ_fit %*% xx_fit
+yy_fit <- xx_fit
 ```
 
 ```{r plot_yy_fit, fig.height=4, fig.width=7, echo=FALSE}
@@ -308,4 +329,8 @@ par(mai=c(0.8,0.8,0.2,0.2))
 matplot(t(yy_fit), type="l", lty="solid",
         xlab="Time", ylab=expression(italic(y)[italic(t)]),
         col=plasma(NN, alpha=0.7, end=0.8))
+```
+
+```{r bayes_plots}
+#bayesplot::mcmc_trace(mcmc_smpl)
 ```
