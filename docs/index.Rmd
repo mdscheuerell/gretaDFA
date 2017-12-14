@@ -20,6 +20,12 @@ _Fish Ecology Division, Northwest Fisheries Science Center, National Marine Fish
 [__Nick Golding__](https://qaeco.com/researchfellows/#ngolding)  
 _Quantitative and Applied Ecology Group, School of BioSciences, University of Melbourne, Melbourne, AUS_
 
+***
+
+__WARNING__: This vignette is still in the testing and evaluating phase and should not be considered complete or error-free.
+
+***
+
 # Background
 
 Dynamic Factor Analysis (DFA) is a dimension reduction technique specific to time series analysis. The general idea is to model $N$ time series as a linear combination of $M$ "hidden", time-varying factors, where $M \ll N$. For an $N \times T$ matrix of data $\mathbf{y}$, where $\mathbf{y}_t$ is an $N \times 1$ column vector, the DFA model (ignoring any covaraite effects) is
@@ -69,9 +75,9 @@ __NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) bef
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. To begin, we'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 12
-TT <- 20
-MM <- 4
+NN <- 6
+TT <- 30
+MM <- 1
 ```
 
 ## Simulate latent trends
@@ -117,6 +123,8 @@ for(i in 1:MM) {
   }
   ZZ[sample(NN,NN),i] <- round(zz,3)
 }
+
+ZZ <- matrix(1, NN, MM)
 ```
 
 ## Create observed time series
@@ -151,7 +159,7 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10,
 
 # Parameter estimation via __greta__
 
-We begin by loading the __tensorflow__ and __greta__ packages, and defining a function that returns the cumulative sum of the rows of a matrix that we will need for estimating the latent states $(\mathbf{x})$.
+We begin by loading the __tensorflow__ and __greta__ packages, and defining a function that returns the cumulative sum of the rows of a matrix that we will use for estimating the latent states $(\mathbf{x})$.
 
 ```{r load_greta, message=FALSE}
 library(tensorflow)
@@ -178,7 +186,7 @@ The first thing to do is specify the prior distributions for the model parameter
 ```{r priors_obs_cov}
 ## cov matrix of obs errors
 RR_est <- as_data(diag(NN))
-diag(RR_est) <- cauchy(0, 25, NN, truncation=c(0, 100))
+diag(RR_est) <- cauchy(0, 5, NN, truncation=c(0, 20))
 ```
 
 However, the specification of $\mathbf{Z}$ is not as simple. To make the model identifiable when $M$ > 1, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 then 
@@ -210,7 +218,7 @@ The reason we defined `ZZ_est_raw` separately here, rather than directly assigni
 
 If we specified $\mathbf{Z}$ correctly, the following should return a 1 for those elements that are to be estimated and a 0 otherwise.
 
-```{r demo_evaluate, cache=TRUE}
+```{r demo_evaluate, cache=FALSE}
 tmp <- evaluate(ZZ_est, list(ZZ_est_raw = rep(1, sum(idx))))
 head(tmp)
 ```
@@ -248,13 +256,56 @@ distribution(yy_vec) = multivariate_normal(Zx_vec, RR_vec)
 Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
-mod <- model(xx_est, ZZ_est, RR_est)
-mcmc_smpl <- mcmc(mod, n_samples=100)
+mod_fit <- model(xx_est, ZZ_est, RR_est)
+mcmc_smpl <- mcmc(mod_fit, n_samples = 100, thin = 1, warmup = 100,
+                  chains = 1, verbose = FALSE)
 ```
 
 # Examining the fits
 
 ```{r examine_fits}
-smry <- summary(mcmc_smpl)
-smry$statistics[,"Mean"]
+mod_smry <- summary(mcmc_smpl)
+fff <- mod_smry$statistics[,"Mean"]
+```
+
+Here are the `r MM` factors.
+
+```{r get_factors}
+
+ZZ_fit <- fff[grepl("ZZ",rownames(mod_smry$statistics))]
+ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+ZZ_fit
+#HH_inv <- varimax(ZZ_fit)$rotmat
+#ZZ_rot <- ZZ_fit %*% HH_inv
+#ZZ_rot
+
+xx_fit <- fff[grepl("xx",rownames(mod_smry$statistics))]
+xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
+# xx_fit <- xx_fit - apply(xx_fit, 1, mean)
+#xx_rot <- solve(HH_inv) %*% xx_fit
+
+RR_fit <- fff[grepl("RR",rownames(mod_smry$statistics))]
+RR_fit <- matrix(RR_fit, NN, NN, byrow=FALSE)
+RR_fit
+```
+
+
+```{r plot_xx_fits, fig.height=4, fig.width=7, echo=FALSE}
+par(mai=c(0.8,0.8,0.2,0.2))
+matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
+        xlab="Time", ylab=expression(italic(x)[italic(t)]),
+        col=plasma(MM, end=0.8))
+```
+
+Here are the expectations.
+
+```{r get_yy_fits}
+yy_fit <- ZZ_fit %*% xx_fit
+```
+
+```{r plot_yy_fit, fig.height=4, fig.width=7, echo=FALSE}
+par(mai=c(0.8,0.8,0.2,0.2))
+matplot(t(yy_fit), type="l", lty="solid",
+        xlab="Time", ylab=expression(italic(y)[italic(t)]),
+        col=plasma(NN, alpha=0.7, end=0.8))
 ```
