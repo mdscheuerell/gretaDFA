@@ -75,9 +75,9 @@ __NOTE__: You will also need to install TensorFlow (version 1.0.0 or higher) bef
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. To begin, we'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 8
+NN <- 12
 TT <- 30
-MM <- 2
+MM <- 3
 ```
 
 ## Simulate latent trends
@@ -124,8 +124,9 @@ for(i in 1:MM) {
   ZZ[sample(NN,NN),i] <- round(zz,3)
 }
 
-ZZ <- matrix(0, NN, MM)
-ZZ[1:NN+NN/2] <- 1
+#ZZ <- matrix(0, NN, MM)
+#ZZ[,1] <- seq(NN)/NN
+#ZZ[,2] <- rev(seq(NN)/NN)
 ```
 
 ## Create observed time series
@@ -253,8 +254,8 @@ xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
 ## vectorize data
 yy_vec <- as_data(matrix(yy, 1, NN*TT))
 ## vectorize mean
-#Zx_vec <- ZZ_est %*% xx_est
-Zx_vec <- c(ZZ %*% xx_est)
+Zx_vec <- c(ZZ_est %*% xx_est)
+#Zx_vec <- c(ZZ %*% xx_est)
 ## create expanded cov matrix
 RR_vec <- zeros(NN*TT, NN*TT)
 diag(RR_vec) <- rep(RR_est_raw, TT)
@@ -267,68 +268,98 @@ distribution(yy_vec) = multivariate_normal(Zx_vec, RR_vec)
 Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
-#mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mod_fit <- model(xx_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 300, thin = 1, warmup = 500,
+mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
+mcmc_smpl <- mcmc(mod_fit, n_samples = 300, thin = 1, warmup = 400,
                   chains = 1, verbose = FALSE)
 ```
 
 # Examining the fits
 
+We begin by summarizing the MCMC samples.
+
 ```{r examine_fits}
 mod_smry <- summary(mcmc_smpl)
-fff <- mod_smry$statistics[,"Mean"]
+par_means <- mod_smry$statistics[,"Mean"]
 ```
 
-Here are the `r MM` factors $\mathbf{x}$.
+## Loadings matrix
+
+Recall how we arbitrarily constrained $\mathbf{Z}$ in such a way to choose only one of many possible solutions, but fortunately the different solutions are equivalent, and they can be related to each other by a rotation matrix $\mathbf{H}$.  Let $\mathbf{H}$ be any $m \times m$ non-singular matrix.  The following are then equivalent DFA models:
+
+$$
+\begin{gathered}
+ \mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t \\
+ \mathbf{y}_t = \mathbf{Z}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t
+\end{gathered}   
+$$
+
+and
+
+$$
+\begin{gathered}
+ \mathbf{H}\mathbf{x}_t = \mathbf{H}\mathbf{x}_{t-1}+\mathbf{H}\mathbf{w}_t \\
+ \mathbf{y}_t = \mathbf{Z}\mathbf{H}^{-1}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t
+\end{gathered}.
+$$
+
+There are many ways of doing factor rotations, but a common method is the "varimax"" rotation, which seeks a rotation matrix $\mathbf{H}$ that creates the largest difference between the loadings in $\mathbf{Z}$.
+ 
+The varimax rotation is easy to compute because R has a built in function for this: `varimax()`. Interestingly, the function returns the inverse of $\mathbf{H}$, which we need anyway.  
+
+```{r get_ZZ_fit}
+ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
+ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+## rotation matrix
+HH_inv <- varimax(ZZ_fit)$rotmat
+## rotated Z
+ZZ_rot <- ZZ_fit %*% HH_inv
+round(ZZ_rot, 2)
+```
+
+## Factors
+
+Here are the `r MM` factors $\mathbf{x}$. Note that we need to rotate these just as we did $\mathbf{Z}$.
 
 ```{r get_factors}
-xx_fit <- fff[grepl("xx",rownames(mod_smry$statistics))]
+# fitted factors
+xx_fit <- par_means[grepl("xx",rownames(mod_smry$statistics))]
 xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
-#xx_rot <- solve(HH_inv) %*% xx_fit
+## rotated factors
+xx_rot <- solve(HH_inv) %*% xx_fit
 ```
-
 
 ```{r plot_xx_fits, fig.height=4, fig.width=7, echo=FALSE}
 par(mai=c(0.8,0.8,0.2,0.2))
-matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
+matplot(t(xx_rot), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
 ```
 
-and the loadings matrix $\mathbf{Z}$.
-
-```{r get_ZZ_fit}
-
-#ZZ_fit <- fff[grepl("ZZ",rownames(mod_smry$statistics))]
-#ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
-#ZZ_fit
-#HH_inv <- varimax(ZZ_fit)$rotmat
-#ZZ_rot <- ZZ_fit %*% HH_inv
-#ZZ_rot
-
-```
+## Covariance matrix
 
 and the covariance matrix $\mathbf{R}$.
 
 ```{r get_RR_fit}
-RR_fit <- fff[grepl("RR",rownames(mod_smry$statistics))]
+RR_fit <- par_means[grepl("RR",rownames(mod_smry$statistics))]
 RR_fit <- diag(RR_fit)
 round(RR_fit, 2)
 ```
 
+## Expectations
+
 Here are the expectations.
 
 ```{r get_yy_fits}
-#yy_fit <- ZZ_fit %*% xx_fit
-yy_fit <- xx_fit
+yy_fit <- ZZ_rot %*% xx_rot
 ```
 
 ```{r plot_yy_fit, fig.height=4, fig.width=7, echo=FALSE}
 par(mai=c(0.8,0.8,0.2,0.2))
-matplot(t(yy_fit), type="l", lty="solid",
+matplot(t(yy), type="l", lty="solid",
         xlab="Time", ylab=expression(italic(y)[italic(t)]),
         col=plasma(NN, alpha=0.7, end=0.8))
+matlines(t(yy_fit), lty="dashed",
+         col=plasma(NN, alpha=0.7, end=0.8))
 ```
 
 ```{r bayes_plots}
