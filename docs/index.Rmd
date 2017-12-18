@@ -85,9 +85,9 @@ library(viridis)
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. We'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 30
-TT <- 30
-MM <- 3
+NN <- 100
+TT <- 50
+MM <- 5
 ```
 
 ## Latent factors
@@ -267,7 +267,7 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 1001, thin = 1, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 1000,
                   chains = 1, verbose = FALSE)
 ```
 
