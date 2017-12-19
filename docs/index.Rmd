@@ -85,8 +85,8 @@ library(viridis)
 Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. We'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 100
-TT <- 50
+NN <- 50
+TT <- 30
 MM <- 5
 ```
 
@@ -221,11 +221,8 @@ Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. I
 The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a relatively uninformative half-cauchy prior on the variances with a scale of 15 and truncate the upper end at 15. 
 
 ```{r priors_obs_cov}
-## empty R
-RR_est <- zeros(NN,NN)
 ## diagonal of R
-RR_est_raw <- cauchy(0, 15, NN, truncation=c(0, 15))
-diag(RR_est) <- RR_est_raw
+RR_est_raw <- cauchy(0, 15, 1, truncation=c(0, 15))
 ```
 
 ## Specify likelihoods
@@ -256,7 +253,7 @@ yy_vec <- as_data(matrix(yy, 1, NN*TT))
 Zx_vec <- c(ZZ_est %*% xx_est)
 ## create expanded cov matrix
 RR_star <- zeros(NN*TT, NN*TT)
-diag(RR_star) <- rep(RR_est_raw, TT)
+diag(RR_star) <- rep(RR_est_raw, NN*TT)
 ## define likelihood
 distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
 ```
