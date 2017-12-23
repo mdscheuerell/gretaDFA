@@ -58,13 +58,13 @@ The [__greta__](https://greta-dev.github.io/greta/) package was designed by NG t
 
 # Requirements
 
-For this vignette we're using the development version of __greta__, which you can install from GitHub via. 
+For this vignette we're using the development version of __greta__, which you can install from GitHub via 
 
 ```{r, eval=FALSE, message=FALSE}
 devtools::install_github('goldingn/greta@dev')
 ```
 
-You will also need to install [TensorFlow](https://www.tensorflow.org/install/) and the [tensorflow](https://cran.r-project.org/web/packages/tensorflow/) package before __greta__ will work. See the output below for the versions used here.
+You will also need to install [TensorFlow](https://www.tensorflow.org/install/) and the [tensorflow](https://cran.r-project.org/web/packages/tensorflow/) package for __R__ before __greta__ will work. See the output below for the versions used here.
 
 ```{r load_pkgs_1, message=FALSE}
 library(tensorflow)
@@ -73,16 +73,34 @@ installed.packages()[c("greta", "tensorflow"), "Version"]
 tensorflow::tf_version()
 ```
 
-In addition, we also make use of `mvrnorm()` function in the __MASS__ package and the color palettes in the __viridis__ package. 
+In addition, we also make use of the `mvrnorm()` function in the __MASS__ package, color palettes in the __viridis__ package, and the `corrplot()` function from the __corrplot__ package. 
 
 ```{r load_pkgs_2, message=FALSE}
 library(MASS)
 library(viridis)
+library(corrplot)
 ```
+
+Lastly, we need to define a function that returns the cumulative sum of the rows (or columns) of a matrix that we will use for estimating the latent factors $(\mathbf{x})$.
+
+```{r load_greta, message=FALSE}
+op <- greta::.internals$nodes$constructors$op
+cumsum_mat <- function(x, a=1L) {
+  ## cumsums across matrix rows/cols
+  ## rows: a = 1L
+  ## cols: a = 0L
+  stopifnot(length(dim(x)) == 2)
+  op("cumsum_mat",
+     x,
+     tf_operation = tf$cumsum,
+     operation_args = list(axis = a))
+}
+```
+
 
 # Simulate data
 
-Here we'll create a large number of time series that share some interdependencies (i.e., common trends) among them, and then we'll see how well __greta__ does at recovering the original parameters. We'll use 100 time series that are 50 units long, each of which is a linear combination of 5 different latent trends.
+Our general approach is to create a large number of time series, each of which to a greater or lesser degree share some temporal patterns with one another. We'll use 50 time series that are 30 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
 NN <- 50
@@ -92,7 +110,9 @@ MM <- 5
 
 ## Latent factors
 
-We begin with the latent factors in $\mathbf{x}$. In this case, each of the rows in $\mathbf{x}$ is an independent random walk, so it's easy to just work with the process errors. Note that after simulating the latent trends, we subtract the mean of each so we can avoid estimating the offsets in the vector $\mathbf{a}$.
+In a DFA model, the rows in the matrix of latent factors $\mathbf{x}$ are generally assumed to be independent random walks, each of which is a cumulative sum of a sequence of independent process errors.
+
+(Note that after simulating the latent trends, we subtract the mean of each to avoid having to estimate the offsets in the vector $\mathbf{a}$.)
 
 ```{r sim_factors, message=FALSE}
 set.seed(123)
@@ -114,7 +134,7 @@ matplot(t(xx), type="b", lty="solid", cex=0.7,
 
 ## Loadings matrix
 
-The next thing to do is create the matrix $\mathbf{Z}$ that maps the trends onto the observations. We want some of the time series to look more like one another than others, so we'll randomly draw the loadings from a uniform range of values within specific blocks. (Note that this bit of code only works if `NN %% MM == 0`.)
+The matrix $\mathbf{Z}$ maps the factors $\mathbf{x}$ onto the observations $\mathbf{y}$. We want some of the time series to look more like one another than others, so we randomly draw the loadings from a uniform range of values within specific blocks. (Note that this bit of code only works if `NN %% MM == 0`.)
 
 ```{r create_Z}
 ## NN x MM loadings matrix
@@ -131,7 +151,7 @@ for(i in 1:MM) {
 
 ## Observed time series
 
-Now we can use the loadings matrix and some observation errors to create the observed time series. Here we'll assume that the errors are IID, and their variance is 0.2. We can ignore the additive effect of the offset vector $\mathbf{a}$ because the expectations of $\mathbf{x}$ and $\mathbf{e}$ are both zero.
+Now we can use the loadings and some observation errors to create the observed time series. Here we assume that the errors are IID, and their variance is 0.2. We can ignore the additive effect of the offset vector $\mathbf{a}$ because the expectations of $\mathbf{x}$ and $\mathbf{e}$ are both zero.
 
 ```{r create_ts}
 ## obs errors
@@ -159,21 +179,7 @@ hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, freq=FALSE,
 
 # Parameter estimation
 
-We begin by defining a function that returns the cumulative sum of the rows (or columns) of a matrix that we will use for estimating the latent factors $(\mathbf{x})$.
-
-```{r load_greta, message=FALSE}
-op <- greta::.internals$nodes$constructors$op
-cumsum_mat <- function(x, a=1L) {
-  ## cumsums across matrix rows/cols
-  ## rows: a = 1L
-  ## cols: a = 0L
-  stopifnot(length(dim(x)) == 2)
-  op("cumsum_mat",
-     x,
-     tf_operation = tf$cumsum,
-     operation_args = list(axis = a))
-}
-```
+Before we can estimate the model parameters we need to specify distributions for the priors and likelihoods.
 
 ## Specify priors
 
@@ -194,7 +200,7 @@ $$
 \end{bmatrix}.   
 $$
 
-Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have already been declared as random.
+Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random.
 
 ```{r priors_loadings}
 ## loadings matrix
@@ -204,11 +210,11 @@ ZZ_est_raw <- normal(0, 10, dim = sum(idx))
 ZZ_est[idx] <- ZZ_est_raw
 ```
 
-The reason we defined `ZZ_est_raw` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, you can calculate the value of a greta array by passing a fixed value for those it depends on.
+The reason we defined `ZZ_est_raw` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
 
-So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of a matrix with a 1 for those elements that are to be estimated and a 0 otherwise.
+So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top of `ZZ_est` with a 1 for those elements that are to be estimated and a 0 otherwise.
 
-```{r demo_evaluate, cache=FALSE}
+```{r demo_evaluate, cache=TRUE}
 head(evaluate(ZZ_est, list(ZZ_est_raw = rep(1, sum(idx)))))
 ```
 
@@ -218,11 +224,11 @@ It looks like everything worked as expected.
 
 Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so we could model them as a set of univariate normals, but we will keep the code general enough to allow for possible covariance(s).
 
-The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a relatively uninformative half-cauchy prior on the variances with a scale of 15 and truncate the upper end at 15. 
+The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a half-cauchy prior on the observation variance with a scale of 15 and truncate the upper end of the distribution at 15. (Note that we follow the __greta__ convention of using the '=' assignment for stochastic nodes.)
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw <- cauchy(0, 15, 1, truncation=c(0, 15))
+RR_est_raw = cauchy(0, 15, 1, truncation=c(0, 15))
 ```
 
 ## Specify likelihoods
@@ -231,12 +237,12 @@ The next step is to specify the likelihood functions.
 
 ### Factors
 
-For the factor model, we need a way to estimate the temporal evolution of the random walks. This is where we can take advantage of the `cumsum_mat()` function we defined above. Also recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.
+For the factor model, we need to specify a model for the temporal evolution of the random walks. This is where we take advantage of the `cumsum_mat()` function we defined above. (Recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.)
 
 ```{r like_factors}
 ## inital factor
 X0 = normal(0, 10, c(MM, 1))
-## factors 2-TT
+## factors for t = 2-TT
 XX = normal(0, 1, c(MM, TT))
 ## combine & cumsum over rows for the random walk
 xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
@@ -244,7 +250,7 @@ xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
 
 ### Observed data
 
-Here __greta__ requires a specification of the expectation for the mean and variance of the multivariate normal distributions. However, rather than draw time-specific samples we will instead 1) create $NT \times 1$ vectors of the data $\mathbf{y}$ and expectation $\mathbf{Z} \mathbf{x}$; and 2) create an $NT \times NT$ covariance matrix based on $T$ replicates of $\mathbf{R}$ along the diagonal.
+__greta__ requires a specification for the mean and variance of the multivariate normal distribution. However, rather than draw time-specific samples we will instead 1) create $NT \times 1$ vectors of the data $\mathbf{y}$ and their expectations $\mathbf{Z} \mathbf{x}$; and 2) create an $NT \times NT$ covariance matrix based on $T$ replicates of $\mathbf{R}$ along the diagonal.
 
 ```{r like_obs, eval=TRUE, echo=TRUE}
 ## vectorize data
@@ -279,12 +285,12 @@ par_means <- mod_smry$statistics[,"Mean"]
 
 ## Loadings matrix
 
-Recall how we arbitrarily constrained $\mathbf{Z}$ in such a way to choose only one of many possible solutions, but fortunately the different solutions are equivalent, and they can be related to each other by a rotation matrix $\mathbf{H}$.  Let $\mathbf{H}$ be any $m \times m$ non-singular matrix.  The following are then equivalent DFA models:
+Recall that we constrained $\mathbf{Z}$ in such a way as to choose only one of many possible solutions, but fortunately they are equivalent and can be related to each other by a rotation matrix. Let $\mathbf{H}$ be any $m \times m$ non-singular matrix.  The following are then equivalent DFA models:
 
 $$
 \begin{gathered}
- \mathbf{x}_t = \mathbf{x}_{t-1}+\mathbf{w}_t \\
- \mathbf{y}_t = \mathbf{Z}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t
+ \mathbf{y}_t \sim \text{MVN}(\mathbf{Z} \mathbf{x}_t, \mathbf{R}) \\
+ \mathbf{x}_t \sim \text{MVN}(\mathbf{x}_{t-1},\mathbf{Q})
 \end{gathered}   
 $$
 
@@ -292,9 +298,9 @@ and
 
 $$
 \begin{gathered}
- \mathbf{H}\mathbf{x}_t = \mathbf{H}\mathbf{x}_{t-1}+\mathbf{H}\mathbf{w}_t \\
- \mathbf{y}_t = \mathbf{Z}\mathbf{H}^{-1}\mathbf{x}_t+\mathbf{a}+\mathbf{v}_t
-\end{gathered}.
+ \mathbf{y}_t \sim \text{MVN}(\mathbf{Z} \mathbf{H}^{-1} \mathbf{x}_t, \mathbf{R}) \\
+ \mathbf{H}\mathbf{x}_t \sim \text{MVN}(\mathbf{H}\mathbf{x}_{t-1},\mathbf{Q})
+\end{gathered}   
 $$
 
 There are many ways of doing factor rotations, but a common method is the "varimax"" rotation, which seeks a rotation matrix $\mathbf{H}$ that creates the largest difference between the loadings in $\mathbf{Z}$.
@@ -333,31 +339,41 @@ matplot(t(xx_rot), type="l", lty="solid", cex=0.7,
         col="darkgray")
 ```
 
+It's difficult to see which factors, if any, align with one another, so here is a graphical representation of their correlation.
+
+```{r corrplot_xx, fig.height=6, fig.width=6}
+par(mai=rep(0.1, 4), omi=rep(0.1, 4))
+corrplot(cor(t(xx), t(xx_rot)), method="ellipse",
+         tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
+         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
+```
+
 ## Covariance matrix
 
-and the covariance matrix $\mathbf{R}$.
+Here is an estimated of the observation variance.
 
 ```{r get_RR_fit}
 RR_fit <- par_means[grepl("RR",rownames(mod_smry$statistics))]
-RR_fit <- diag(RR_fit)
 round(RR_fit, 2)
 ```
 
-## Expectations
+The estimate is really close to the true value of 0.2.
 
-Here are the expectations.
+## Fitted vs observed
 
-```{r get_yy_fits}
+Here is a graphical representation of the correlation between the observed and fitted data for the `r NN` time series. Note that their (row, col) ordering is arbitrary.
+
+```{r cor_yy}
+## fitted values
 yy_fit <- ZZ_rot %*% xx_rot
-```
-
-```{r plot_yy_fit, fig.height=4, fig.width=7, echo=FALSE}
-par(mai=c(0.8,0.8,0.2,0.2))
-matplot(t(yy), type="l", lty="solid",
-        xlab="Time", ylab=expression(italic(y)[italic(t)]),
-        col=plasma(NN, alpha=0.7, end=0.8))
-matlines(t(yy_fit), lty="dashed",
-         col=plasma(NN, alpha=0.7, end=0.8))
+## corrrelation
+cor_yy <- matrix(diag(cor(t(yy), t(yy_fit))), NN/10, 10)
+## plots
+par(mai=rep(0.1, 4), omi=rep(0.1, 4))
+corrplot(cor_yy, method="ellipse",
+         tl.pos = "n",
+         cl.cex = 0.8, cl.offset = 0.9,
+         cl.ratio = 0.2, cl.lim = c(0, 1))
 ```
 
 ```{r bayes_plots}
