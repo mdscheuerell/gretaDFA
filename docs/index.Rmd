@@ -172,9 +172,9 @@ It's hard to tell from this plot how many of the `r NN` time series are correlat
 ```{r hist_cor_coefs, fig.height=7, fig.width=7, echo=FALSE}
 rho <- cor(t(yy))
 par(mai=c(0.8,0.8,0.2,0.2))
-corrplot(rho, method="ellipse", order = "hclust",
+corrplot(rho, method="ellipse", type="lower", order = "hclust",
          tl.col = "black", tl.srt = 0, tl.cex = 0.6, tl.offset = 0.7,
-         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
+         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.1)
 ```
 
 # Parameter estimation
@@ -287,6 +287,11 @@ par(mfrow=c(2,2), mai=c(0.8,0.5,0.2,0.2))
 for(i in 1:4) {
   coda::traceplot(mcmc_smpl[[1]][,i]) 
 }
+```
+
+```{r bayesplot, fig.height=5, fig.width=7, eval=FALSE, echo=FALSE}
+par(mai=c(0.8,0.5,0.2,0.2))
+bayesplot::mcmc_trace(as.matrix(mcmc_smpl[[1]][,1:4]))
 ```
 
 These chains clearly show evidence of nonconvergence, suggesting we need to use a longer burnin period.
