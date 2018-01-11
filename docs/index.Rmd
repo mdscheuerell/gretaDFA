@@ -18,7 +18,7 @@ options(tensorflow.one_based_extract = TRUE)
 _Northwest Fisheries Science Center, National Oceanic and Atmospheric Administration, Seattle, WA USA_
 
 [__Nick Golding__](https://qaeco.com/researchfellows/#ngolding)  
-_Quantitative and Applied Ecology Group, School of BioSciences, University of Melbourne, Melbourne, AUS_
+_Quantitative and Applied Ecology Group, School of BioSciences, University of Melbourne, Melbourne, Victoria, AUS_
 
 ***
 
@@ -167,14 +167,14 @@ matplot(t(yy), type="l", lty="solid",
         col=plasma(NN, alpha=0.7, end=0.8))
 ```
 
-It's hard to tell from this plot how many of the `r NN` time series are correlated. Here is a histogram of the correlation coefficients for all of the pairwise comparisons. 
+It's hard to tell from this plot how many of the `r NN` time series are correlated. Here is a plot of the correlation coefficients for all of the pairwise comparisons with them clustered by similarity. 
 
-```{r hist_cor_coefs, fig.height=4, fig.width=7, echo=FALSE}
+```{r hist_cor_coefs, fig.height=7, fig.width=7, echo=FALSE}
 rho <- cor(t(yy))
 par(mai=c(0.8,0.8,0.2,0.2))
-hist(rho[lower.tri(rho)], breaks=seq(-10,10)/10, freq=FALSE,
-     col=plasma(1,begin=0.5,end=0.5), border="white",
-     xlab="Correlation", ylab="", main="")
+corrplot(rho, method="ellipse", order = "hclust",
+         tl.col = "black", tl.srt = 0, tl.cex = 0.6, tl.offset = 0.7,
+         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
 ```
 
 # Parameter estimation
@@ -274,7 +274,41 @@ mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 1000,
                   chains = 1, verbose = FALSE)
 ```
 
+# Assessing convergence
+
+It is important to determine whether or not the model has converged before we can place any confidence in the results. Among the many diagnostic measures available, the options are somwhat limited when there is only one chain. 
+
+## Traceplots
+
+One quick option is to visually inspect the MCMC traces with `traceplot()` from the __coda__ package. Because the output is so voluminous, we only show them for the first 4 estimates.
+
+```{r traceplots, fig.height=5, fig.width=7}
+par(mfrow=c(2,2), mai=c(0.8,0.5,0.2,0.2))
+for(i in 1:4) {
+  coda::traceplot(mcmc_smpl[[1]][,i]) 
+}
+```
+
+These chains clearly show evidence of nonconvergence, suggesting we need to use a longer burnin period.
+
+## Formal test
+
+Another more formal (and faster) option is to use the Heidelberger and Welch’s convergence diagnostic, which is also available in the __coda__ package. In particular, we can ask what percent of the estimates pass the half-width test, which compares the means from beginning and ending sections of the chain.
+
+```{r converge_chk}
+## number of estimated params/states
+n_par <- dim(mcmc_smpl[[1]])[2]
+## H&W diag: pass (1) or fail (NA)
+halfwidth_test <- coda::heidel.diag(mcmc_smpl[[1]])[,4]
+## proportion passing
+round(sum(halfwidth_test, na.rm = TRUE) / n_par, 2)
+```
+
+Only about `r round(sum(halfwidth_test, na.rm = TRUE) / n_par, 2)*100`% of the estimates appear to have converged, but that isn't too surprising given the relatively short burnin period and subsequent chain length.
+
 # Examining the fits
+
+(_Note that from here we proceed as though the model had converged_.)
 
 We begin by summarizing the MCMC samples.
 
@@ -374,8 +408,4 @@ corrplot(cor_yy, method="ellipse",
          tl.pos = "n",
          cl.cex = 0.8, cl.offset = 0.9,
          cl.ratio = 0.2, cl.lim = c(0, 1))
-```
-
-```{r bayes_plots}
-#bayesplot::mcmc_trace(mcmc_smpl)
 ```
