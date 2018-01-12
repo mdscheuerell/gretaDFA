@@ -14,6 +14,8 @@ knitr::opts_chunk$set(echo = TRUE)
 options(tensorflow.one_based_extract = TRUE)
 ```
 
+<br/>
+
 [__Mark D. Scheuerell__](https://faculty.washington.edu/scheuerl/)  
 _Northwest Fisheries Science Center, National Oceanic and Atmospheric Administration, Seattle, WA USA_
 
@@ -22,13 +24,13 @@ _Quantitative and Applied Ecology Group, School of BioSciences, University of Me
 
 ***
 
-__DISCLAIMER__  
-
-This vignette is still in the testing and evaluating phase and should not be considered complete or error-free.
-
 This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
 
 ***
+
+__DISCLAIMER__  
+
+This vignette is still in the testing and evaluating phase and should not be considered complete or error-free.
 
 # Background
 
@@ -270,7 +272,7 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 2000,
                   chains = 1, verbose = FALSE)
 ```
 
@@ -294,7 +296,7 @@ par(mai=c(0.8,0.5,0.2,0.2))
 bayesplot::mcmc_trace(as.matrix(mcmc_smpl[[1]][,1:4]))
 ```
 
-These chains clearly show evidence of nonconvergence, suggesting we need to use a longer burnin period.
+These chains clearly show evidence of nonconvergence and also some autocorrelation, suggesting we need to use a longer burnin period and perhaps some thinning as well.
 
 ## Formal test
 
