@@ -272,7 +272,7 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 2000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 5000, thin = 10, warmup = 5000,
                   chains = 1, verbose = FALSE)
 ```
 
