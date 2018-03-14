@@ -211,11 +211,11 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ZZ_est <- zeros(NN,MM)
 ## diagonal (must be positive)
 idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, Inf))
+ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 5))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s))
+ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-5, 5))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -238,7 +238,7 @@ The maximum variance among all of the observed time series is about `r round(max
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw = cauchy(0, 15, 1, truncation=c(0, 15))
+RR_est_raw = cauchy(0, 15, 1, truncation=c(0, 5))
 ```
 
 ## Specify likelihoods
