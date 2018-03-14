@@ -207,17 +207,23 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ```{r priors_loadings}
 ## loadings matrix
 ZZ_est <- zeros(NN,MM)
-idx <- lower.tri(ZZ_est, diag = TRUE)
-ZZ_est_raw <- normal(0, 10, dim = sum(idx))
-ZZ_est[idx] <- ZZ_est_raw
+## sub-diagonal
+idx_s <- lower.tri(ZZ_est)
+ZZ_est_raw_s <- normal(0, 10, dim = sum(idx_s))
+ZZ_est[idx_s] <- ZZ_est_raw_s
+## diagonal (must be positive)
+idx_d <- lower.tri(ZZ_est, diag=TRUE) != idx_s
+ZZ_est_raw_d <- normal(0, 10, dim = sum(idx_d))
+ZZ_est[idx_d] <- ZZ_est_raw_d
 ```
 
-The reason we defined `ZZ_est_raw` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
+The reason we defined `ZZ_est_raw_` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
 
 So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top of `ZZ_est` with a 1 for those elements that are to be estimated and a 0 otherwise.
 
 ```{r demo_evaluate, cache=TRUE}
-head(evaluate(ZZ_est, list(ZZ_est_raw = rep(1, sum(idx)))))
+head(calculate(ZZ_est, list(ZZ_est_raw_s = rep(1, sum(idx_s)),
+                            ZZ_est_raw_d = rep(1, sum(idx_d)))))
 ```
 
 It looks like everything worked as expected.
