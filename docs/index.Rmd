@@ -202,21 +202,21 @@ $$
 \end{bmatrix}.   
 $$
 
-Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence.
+Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
 
-Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random.
+Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
 ```{r priors_loadings}
 ## loadings matrix
 ZZ_est <- zeros(NN,MM)
+## diagonal (must be positive)
+idx_d <- row(ZZ_est) == col(ZZ_est)
+ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, Inf))
+ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s <- normal(0, 10, dim = sum(idx_s))
+ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s))
 ZZ_est[idx_s] <- ZZ_est_raw_s
-## diagonal (must be positive)
-idx_d <- lower.tri(ZZ_est, diag=TRUE) != idx_s
-ZZ_est_raw_d <- normal(0, 10, dim = sum(idx_d))
-ZZ_est[idx_d] <- ZZ_est_raw_d
 ```
 
 The reason we defined `ZZ_est_raw_` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
@@ -234,7 +234,7 @@ It looks like everything worked as expected.
 
 Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so we could model them as a set of univariate normals, but we will keep the code general enough to allow for possible covariance(s).
 
-The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a half-cauchy prior on the observation variance with a scale of 15 and truncate the upper end of the distribution at 15. (Note that we follow the __greta__ convention of using the '=' assignment for stochastic nodes.)
+The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a half-cauchy prior on the observation variance with a scale of 15 and truncate the upper end of the distribution at 15.
 
 ```{r priors_obs_cov}
 ## diagonal of R
