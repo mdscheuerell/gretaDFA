@@ -202,6 +202,8 @@ $$
 \end{bmatrix}.   
 $$
 
+Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence.
+
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random.
 
 ```{r priors_loadings}
