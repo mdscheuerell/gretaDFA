@@ -114,16 +114,13 @@ MM <- 5
 
 In a DFA model, the rows in the matrix of latent factors $\mathbf{x}$ are generally assumed to be independent random walks, each of which is a cumulative sum of a sequence of independent process errors.
 
-(Note that after simulating the latent trends, we subtract the mean of each to avoid having to estimate the offsets in the vector $\mathbf{a}$.)
-
 ```{r sim_factors, message=FALSE}
 set.seed(123)
 ## MM x TT matrix of innovations
 ww <- matrix(rnorm(MM*TT, 0, 1), MM, TT)
+ww[,1] <- rnorm(MM, 0, sqrt(5))
 ## MM x TT matrix of latent trends
 xx <- t(apply(ww,1,cumsum))
-## convert to mean-zero
-xx <- xx - apply(xx,1,mean)
 ```
 
 ```{r plot_factors, fig.height=4, fig.width=7, echo=FALSE}
@@ -202,9 +199,9 @@ $$
 \end{bmatrix}.   
 $$
 
-Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
+Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
 
-Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
+The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
 ```{r priors_loadings}
 ## loadings matrix
