@@ -240,11 +240,11 @@ It looks like everything worked as expected.
 
 Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so we could model them as a set of univariate normals, but we will keep the code general enough to allow for possible covariance(s).
 
-The maximum variance among all of the observed time series is about `r round(max(apply(yy, 1, var)),)` so we'll use a half-cauchy prior on the observation variance with a scale of 15 and truncate the upper end of the distribution at 15.
+We will scale the observations before fitting, so the maximum variance of the observation errors is 1. Thus, we'll use a half-cauchy prior on the observation variance with a scale of 5 and truncate the upper end of the distribution at 1.
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw = cauchy(0, 15, 1, truncation=c(0, 5))
+RR_est_raw = cauchy(0, 5, 1, truncation=c(0, 1))
 ```
 
 ## Specify likelihoods
