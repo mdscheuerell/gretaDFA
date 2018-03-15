@@ -184,7 +184,7 @@ Before we can estimate the model parameters we need to specify distributions for
 
 ### Loadings matrix
 
-To make the model identifiable when $M$ > 1, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 then 
+To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 then 
 
 $$
 \mathbf{Z} = 
@@ -199,20 +199,29 @@ $$
 \end{bmatrix}.   
 $$
 
-Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. Furthermore, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
+Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
 
-The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
+Because we will scale the data below before fitting the model, we can impose some restrictions on the bounds of the priors for the elements in $\mathbf{Z}$. Specifically, via truncated diffuse normal distributions, we will set
+
+$$
+z_{ij} \in [0,1] ~ \forall ~ i = j
+$$
+$$
+z_{ij} \in [-1,1] ~ \forall ~ i > j
+$$
+
+Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
 ```{r priors_loadings}
 ## loadings matrix
 ZZ_est <- zeros(NN,MM)
 ## diagonal (must be positive)
 idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 5))
+ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 1))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-5, 5))
+ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-1, 1))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -259,9 +268,13 @@ xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
 
 __greta__ requires a specification for the mean and variance of the multivariate normal distribution. However, rather than draw time-specific samples we will instead 1) create $NT \times 1$ vectors of the data $\mathbf{y}$ and their expectations $\mathbf{Z} \mathbf{x}$; and 2) create an $NT \times NT$ covariance matrix based on $T$ replicates of $\mathbf{R}$ along the diagonal.
 
+Note that we will scale each of the $\mathbf{y}_i$ time series in $\mathbf{y}$ to have unit variance so we won't have to estimate $\mathbf{a}$.
+
 ```{r like_obs, eval=TRUE, echo=TRUE}
+## scale data
+yy_z <- t(scale(t(yy)))
 ## vectorize data
-yy_vec <- as_data(matrix(yy, 1, NN*TT))
+yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
 Zx_vec <- c(ZZ_est %*% xx_est)
 ## create expanded cov matrix
