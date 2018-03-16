@@ -105,7 +105,7 @@ cumsum_mat <- function(x, a=1L) {
 Our general approach is to create a large number of time series, each of which to a greater or lesser degree share some temporal patterns with one another. We'll use 50 time series that are 30 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 50
+NN <- 30
 TT <- 30
 MM <- 5
 ```
@@ -184,7 +184,7 @@ Before we can estimate the model parameters we need to specify distributions for
 
 ### Loadings matrix
 
-To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero. For example, if $M$ = 4 then 
+To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 4 then 
 
 $$
 \mathbf{Z} = 
@@ -199,9 +199,9 @@ $$
 \end{bmatrix}.   
 $$
 
-Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0$ $\forall$ $i = j$.
+Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$).
 
-Because we will scale the data below before fitting the model, we can impose some restrictions on the bounds of the priors for the elements in $\mathbf{Z}$. Specifically, via truncated diffuse normal distributions, we will set
+Because we will scale the data below before fitting the model, we can impose some restrictions on the bounds of the priors for the elements in $\mathbf{Z}$. Specifically, via truncated, diffuse normal distributions, we will set
 
 $$
 z_{ij} \in [0,1] ~ \forall ~ i = j
@@ -217,11 +217,11 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ZZ_est <- zeros(NN,MM)
 ## diagonal (must be positive)
 idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 1))
+ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 5))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-1, 1))
+ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-5, 5))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -244,7 +244,7 @@ We will scale the observations before fitting, so the maximum variance of the ob
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw = cauchy(0, 5, 1, truncation=c(0, 1))
+RR_est_raw = cauchy(0, 5, 1, truncation=c(0, 5))
 ```
 
 ## Specify likelihoods
@@ -257,7 +257,7 @@ For the factor model, we need to specify a model for the temporal evolution of t
 
 ```{r like_factors}
 ## inital factor
-X0 = normal(0, 10, c(MM, 1))
+X0 = normal(0, sqrt(10), c(MM, 1))
 ## factors for t = 2-TT
 XX = normal(0, 1, c(MM, TT))
 ## combine & cumsum over rows for the random walk
@@ -272,7 +272,7 @@ Note that we will scale each of the $\mathbf{y}_i$ time series in $\mathbf{y}$ t
 
 ```{r like_obs, eval=TRUE, echo=TRUE}
 ## scale data
-yy_z <- t(scale(t(yy)))
+yy_z <- t(scale(t(yy), center = FALSE))
 ## vectorize data
 yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
@@ -290,7 +290,7 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 5000, thin = 4, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 2, warmup = 1000,
                   chains = 1, verbose = FALSE)
 ```
 
@@ -378,14 +378,12 @@ round(ZZ_rot, 2)
 
 ## Factors
 
-Here are the `r MM` factors in $\mathbf{x}$. Note that we need to rotate these just as we did $\mathbf{Z}$. The top panel has the true factors; the bottom panel shows the estimated factors. Note that there is no way to insure that the specific ordering of the estimated factors will match the true factors.
+Here are the `r MM` factors in $\mathbf{x}$. The top panel has the true factors; the bottom panel shows the estimated factors. Note that there is no way to insure that the specific ordering of the estimated factors will match the true factors.
 
 ```{r get_factors}
 # fitted factors
 xx_fit <- par_means[grepl("xx",rownames(mod_smry$statistics))]
 xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
-## rotated factors
-xx_rot <- solve(HH_inv) %*% xx_fit
 ```
 
 ```{r plot_xx_fits, fig.height=7, fig.width=7, echo=FALSE}
@@ -393,7 +391,7 @@ par(mfrow=c(2,1), mai=c(0.8,0.8,0.2,0.2))
 matplot(t(xx), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
-matplot(t(xx_rot), type="l", lty="solid", cex=0.7,
+matplot(t(xx_fit), type="l", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col="darkgray")
 ```
@@ -402,7 +400,7 @@ It's difficult to see which factors, if any, align with one another, so here is 
 
 ```{r corrplot_xx, fig.height=6, fig.width=6}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
-corrplot(cor(t(xx), t(xx_rot)), method="ellipse",
+corrplot(cor(t(xx), t(xx_fit)), method="ellipse",
          tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
          cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
 ```
@@ -416,21 +414,19 @@ RR_fit <- par_means[grepl("RR",rownames(mod_smry$statistics))]
 round(RR_fit, 2)
 ```
 
-The estimate is really close to the true value of 0.2.
-
 ## Fitted vs observed
 
 Here is a graphical representation of the correlation between the observed and fitted data for the `r NN` time series. Note that their (row, col) ordering is arbitrary.
 
 ```{r cor_yy}
 ## fitted values
-yy_fit <- ZZ_rot %*% xx_rot
+yy_fit <- ZZ_rot %*% xx
 ## corrrelation
-cor_yy <- matrix(diag(cor(t(yy), t(yy_fit))), NN/10, 10)
+cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/10, 10)
 ## plots
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
 corrplot(cor_yy, method="ellipse",
          tl.pos = "n",
          cl.cex = 0.8, cl.offset = 0.9,
-         cl.ratio = 0.2, cl.lim = c(0, 1))
+         cl.ratio = 0.2, )#cl.lim = c(0, 1))
 ```
