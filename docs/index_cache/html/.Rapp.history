@@ -1,2 +1,0 @@
-load("/Users/mark/Documents/GitHub/gretaDFA/docs/index_cache/html/greta_model_990c2ef3383572beeb21444259915157.RData")
-lazyLoad(sub(".rdb","",grep("^model_greta.*.rdb",dir(),value=TRUE)))

@@ -105,9 +105,9 @@ cumsum_mat <- function(x, a=1L) {
 Our general approach is to create a large number of time series, each of which to a greater or lesser degree share some temporal patterns with one another. We'll use 50 time series that are 30 units long, each of which is a linear combination of 5 different latent trends.
 
 ```{r data_inits}
-NN <- 30
+NN <- 21
 TT <- 30
-MM <- 5
+MM <- 3
 ```
 
 ## Latent factors
@@ -217,11 +217,11 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ZZ_est <- zeros(NN,MM)
 ## diagonal (must be positive)
 idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0, 5))
+ZZ_est_raw_d = normal(0, 1, dim = sum(idx_d), truncation = c(0, Inf))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-5, 5))
+ZZ_est_raw_s = normal(0, 1, dim = sum(idx_s))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -244,7 +244,7 @@ We will scale the observations before fitting, so the maximum variance of the ob
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw = cauchy(0, 5, 1, truncation=c(0, 5))
+RR_est_raw = student(10, 0, 1, truncation=c(0, Inf))
 ```
 
 ## Specify likelihoods
@@ -272,7 +272,7 @@ Note that we will scale each of the $\mathbf{y}_i$ time series in $\mathbf{y}$ t
 
 ```{r like_obs, eval=TRUE, echo=TRUE}
 ## scale data
-yy_z <- t(scale(t(yy), center = FALSE))
+yy_z <- t(scale(t(yy)))
 ## vectorize data
 yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
@@ -369,6 +369,7 @@ The varimax rotation is easy to compute because R has a built in function for th
 ```{r get_ZZ_fit}
 ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
 ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+round(ZZ_fit, 2)
 ## rotation matrix
 HH_inv <- varimax(ZZ_fit)$rotmat
 ## rotated Z
