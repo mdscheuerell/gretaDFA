@@ -7,13 +7,11 @@
 ## }
 
 LD_diag <- function(x, sigma) {
-  ## log-likelihood for Leung & Drton prior
+  ## log pdf for Leung & Drton prior
   ## x is diag of loadings matrix
   ## sigma is scale parameter
   n <- length(x)
   ## log pdf
-  lpdf <- (n - seq(n)) * log(x) - (0.5/sigma*x^2)
-  ## log likelihood
-  LL <- sum(lpdf)
-  return(LL)
+  lpdf <- sum((n - seq(n)) * log(x) - (0.5/sigma*x^2))
+  return(ldpf)
 }
