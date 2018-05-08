@@ -6,11 +6,14 @@
 ##   target += (k - i) * log(beta_diag[i]) - .5 * beta_diag[i] ^ 2 / sigma_L;
 ## }
 
-nn <- 10
-beta <- seq(10)/10
-LL <- 0
-sigma <- 1
-
-for(i in 1:nn) {
-  LL <- LL + (nn-i) * log(beta[i]) - (0.5*beta[i]^2)/sigma
+LD_diag <- function(x, sigma) {
+  ## log-likelihood for Leung & Drton prior
+  ## x is diag of loadings matrix
+  ## sigma is scale parameter
+  n <- length(x)
+  ## log pdf
+  lpdf <- (n - seq(n)) * log(x) - (0.5/sigma*x^2)
+  ## log likelihood
+  LL <- sum(lpdf)
+  return(LL)
 }
