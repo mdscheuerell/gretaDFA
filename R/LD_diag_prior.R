@@ -9,5 +9,5 @@ LD_diag <- function(x, sigma) {
   n <- length(x)
   ## log pdf
   lpdf <- (n - seq(n)) * log(x) - (0.5/sigma*x^2)
-  return(ldpf)
+  return(lpdf)
 }
