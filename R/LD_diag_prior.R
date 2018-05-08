@@ -8,6 +8,6 @@ LD_diag <- function(x, sigma) {
   ## sigma is scale parameter
   n <- length(x)
   ## log pdf
-  lpdf <- sum((n - seq(n)) * log(x) - (0.5/sigma*x^2))
+  lpdf <- (n - seq(n)) * log(x) - (0.5/sigma*x^2)
   return(ldpf)
 }
