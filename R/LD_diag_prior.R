@@ -11,10 +11,10 @@ LD_diagv <- function(X, sigma) {
   return(lpdf)
 }
 
-LD_diag <- function(xii, i, m, sigma) {
+LD_diag <- function(xi, i, m, sigma) {
   ## log pdf for Leung & Drton prior
-  ## for i in 1:m, xii = X[i,i] > 0 
+  ## for i in 1:m, xi = X[i] > 0
   ## m is number of factors
   ## sigma is scale parameter
-  (m - i) * log(xii) - xii^2 / (2 * sigma)
+  (m - i) * log(xi) - xi^2 / (2 * sigma)
 }
