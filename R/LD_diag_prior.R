@@ -2,20 +2,19 @@
 ## based on eqn 2.2 in Leung and Drton (2016) 
 ## https://arxiv.org/abs/1409.7672v1
 
-LD_diagv <- function(x, sigma) {
+LD_diagv <- function(X, sigma) {
   ## log pdf for Leung & Drton prior
-  ## x is diag of loadings matrix; x > 0
+  ## X is diag of loadings matrix; X > 0
   ## sigma is scale parameter
-  n <- length(x)
-  lpdf <- (n - seq(n)) * log(x) - x^2 / (2 * sigma)
+  n <- length(X)
+  lpdf <- (n - seq(n)) * log(X) - X^2 / (2 * sigma)
   return(lpdf)
 }
 
-LD_diag <- function(x, i, m, sigma) {
+LD_diag <- function(xii, i, m, sigma) {
   ## log pdf for Leung & Drton prior
-  ## x is diag of loadings matrix; x > 0
-  ## i is index along diagonal
+  ## for i in 1:m, xii = X[i,i] > 0 
   ## m is number of factors
   ## sigma is scale parameter
-  (m - i) * log(x) - x^2 / (2 * sigma)
+  (m - i) * log(xii) - xii^2 / (2 * sigma)
 }
