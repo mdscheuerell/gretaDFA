@@ -63,7 +63,7 @@ The [__greta__](https://greta-dev.github.io/greta/) package was designed by NG t
 For this vignette we're using the development version of __greta__, which you can install from GitHub via 
 
 ```{r, eval=FALSE, message=FALSE}
-devtools::install_github('goldingn/greta@dev')
+devtools::install_github('greta-dev/greta@dev')
 ```
 
 You will also need to install [TensorFlow](https://www.tensorflow.org/install/) and the [tensorflow](https://cran.r-project.org/web/packages/tensorflow/) package for __R__ before __greta__ will work. See the output below for the versions used here.
@@ -212,7 +212,7 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ZZ_est <- zeros(NN,MM)
 ## diagonal (must be positive)
 idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = normal(0, 1, dim = sum(idx_d), truncation = c(0, Inf))
+ZZ_est_raw_d = ld(sigma, MM)
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
