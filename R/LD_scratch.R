@@ -1,5 +1,7 @@
 library (greta)
 
+library(future)
+
 # a temporary hack to test out the distribution
 library (R6)
 library (tensorflow)
@@ -67,9 +69,12 @@ ld_distribution <- R6Class (
   )
 )
 
-z <- ld(sigma = 10, dim = 3)
+z <- ld(sigma = 0.5, dim = 2)
 m <- model(z)
-draws <- mcmc(m, chains = 2)
+
+plan(multisession)
+
+draws <- mcmc(m, chains = 4, n_samples = 5000, warmup = 1000, thin = 10)
 plot(draws)
 
 dd <- do.call(rbind, draws)
@@ -79,5 +84,18 @@ apply(dd, 2, sd) / apply(dd, 2, mean)
 
 coda::effectiveSize(draws)
 coda::gelman.diag(draws)
+
+
+npdf <- function(x, mu = 0, sigma = 1) {
+  pp <- exp(-(x - mu)^2 / (2*sigma^2))
+  np <- pp/sqrt(2*pi*sigma^2)
+  return(np)
+}
+
+xx <- seq(-500,500)/100
+plot(xx, npdf(xx), type="l")
+
+
+
 
 
