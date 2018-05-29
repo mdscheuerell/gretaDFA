@@ -210,12 +210,17 @@ and the last element follows a truncated normal distribution, such that $z_{MM} 
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
 ```{r priors_loadings}
-## loadings matrix
+## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
-## diagonal (must be positive)
-idx_d <- row(ZZ_est) == col(ZZ_est)
-ZZ_est_raw_d = ld(sigma, MM)
+## define sigma
+sigma = normal(0, 5, truncation = c(0, Inf))
+## diagonal for elements 1:(M-1)
+idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
+ZZ_est_raw_d = ld(sigma, MM-1)
 ZZ_est[idx_d] <- ZZ_est_raw_d
+## diagonal for element M
+ZZ_est_raw_M = normal(0, sigma, dim = 1, truncation = c(0, Inf))
+ZZ_est[MM,MM] <- ZZ_est_raw_M
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
 ZZ_est_raw_s = normal(0, 1, dim = sum(idx_s))
@@ -224,11 +229,16 @@ ZZ_est[idx_s] <- ZZ_est_raw_s
 
 The reason we defined `ZZ_est_raw_?` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
 
-So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top of `ZZ_est` with a 1 for those elements that are to be estimated and a 0 otherwise.
+So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of `ZZ_est` with the following values:
+
+ * a 1 for the 1:(M-1) diagonal elements;
+ * a 2 for the M^th^ diagonal element; and
+ * a 3 for all of the subdiagonal elements.
 
 ```{r demo_evaluate, cache=TRUE}
-head(calculate(ZZ_est, list(ZZ_est_raw_s = rep(1, sum(idx_s)),
-                            ZZ_est_raw_d = rep(1, sum(idx_d)))))
+head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
+                            ZZ_est_raw_M = 2,
+                            ZZ_est_raw_s = rep(3, sum(idx_s)))))
 ```
 
 It looks like everything worked as expected.
