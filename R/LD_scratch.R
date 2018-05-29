@@ -51,7 +51,7 @@ ld_distribution <- R6Class (
       
       sigma <- parameters$sigma
       n <- self$dim[1]
-      
+
       const <- fl(n - seq(n))
       
       log_prob = function (x) {
@@ -72,7 +72,7 @@ ld_distribution <- R6Class (
 z <- ld(sigma = 0.5, dim = 2)
 m <- model(z)
 
-plan(multisession)
+plan(multicore)
 
 draws <- mcmc(m, chains = 4, n_samples = 5000, warmup = 1000, thin = 10)
 plot(draws)
@@ -80,6 +80,10 @@ plot(draws)
 dd <- do.call(rbind, draws)
 ## approximate CV
 apply(dd, 2, sd) / apply(dd, 2, mean)
+
+apply(dd, 2, quantile)
+dd <- apply(dd, 2, sort)
+
 
 
 coda::effectiveSize(draws)
@@ -95,6 +99,20 @@ npdf <- function(x, mu = 0, sigma = 1) {
 xx <- seq(-500,500)/100
 plot(xx, npdf(xx), type="l")
 
+
+
+
+pld <- function(X, sigma = 1) {
+  n <- length(X)
+  pdf <- X^(n - seq(n)) * exp(- X^2 / (2 * sigma))
+  return(pdf)
+}
+
+xx <- seq(1000)/100
+yy <- matrix(xx,length(xx),2)
+pp <- apply(yy, 1, pld)
+
+matplot(xx, t(apply(yy, 1, pld)), type="l")
 
 
 
