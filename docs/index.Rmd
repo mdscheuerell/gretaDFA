@@ -9,6 +9,7 @@ output:
     fig_caption: yes
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 options(tensorflow.one_based_extract = TRUE)
@@ -94,11 +95,77 @@ cumsum_mat <- function(x, a=1L) {
   stopifnot(length(dim(x)) == 2)
   op("cumsum_mat",
      x,
-     tf_operation = tf$cumsum,
+     tf_operation = "tf$cumsum",
      operation_args = list(axis = a))
 }
 ```
 
+```{r, echo = FALSE}
+library (R6)
+distrib <- .internals$nodes$constructors$distrib
+distribution_node <- .internals$nodes$node_classes$distribution_node
+check_dims <- .internals$utils$checks$check_dims
+as.greta_array <- .internals$greta_arrays$as.greta_array
+is_scalar <- .internals$utils$misc$is_scalar
+fl <- .internals$utils$misc$fl
+
+ld <- function (sigma, dim = 2)
+  distrib("ld", sigma, dim)
+
+ld_distribution <- R6Class (
+  "ld_distribution",
+  inherit = distribution_node,
+  public = list(
+    
+    initialize = function (sigma, dim) {
+      
+      sigma <- as.greta_array(sigma)
+      
+      if (!is_scalar(sigma)) {
+        stop ("sigma must be a scalar, but had dimensions: ",
+              capture.output(dput(dim(eta))),
+              call. = FALSE)
+      }
+      
+      # check dim is a positive scalar integer
+      dim_old <- dim
+      dim <- as.integer(dim)
+      if (length(dim) > 1 || dim <= 0 || !is.finite(dim)) {
+        
+        stop ("dim must be a scalar positive integer, but was: ",
+              capture.output(dput(dim_old)),
+              call. = FALSE)
+        
+      }
+      
+      self$bounds <- c(0, Inf)
+      super$initialize("ld", dim, truncation = c(0, Inf))
+      self$add_parameter(sigma, "sigma")
+      
+    },
+    
+    tf_distrib = function (parameters, dag) {
+      
+      sigma <- parameters$sigma
+      n <- self$dim[1]
+      
+      const <- fl(n - seq(n))
+      
+      log_prob = function (x) {
+        const * tf$log(x) - x ^ fl(2) / (fl(2) * sigma)
+      }
+      
+      list(log_prob = log_prob, cdf = NULL, log_cdf = NULL)
+      
+    },
+    
+    # no CDF for discrete distributions
+    tf_cdf_function = NULL,
+    tf_log_cdf_function = NULL
+    
+  )
+)
+```
 
 # Simulate data
 
@@ -237,7 +304,7 @@ So, for example, if we specified $\mathbf{Z}$ correctly, the following should re
 
 ```{r demo_evaluate, cache=TRUE}
 head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
-                            ZZ_est_raw_M = 2,
+                            ZZ_est_raw_M = matrix(2),
                             ZZ_est_raw_s = rep(3, sum(idx_s)))))
 ```
 
@@ -297,7 +364,7 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 2, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 1000, thin = 1, warmup = 1000,
                   chains = 1, verbose = FALSE)
 ```
 
