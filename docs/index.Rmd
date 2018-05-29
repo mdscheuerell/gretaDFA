@@ -199,11 +199,13 @@ $$
 \end{bmatrix}.   
 $$
 
-Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ has density proportional to
+Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ where $i \leq (M - 1)$ has density proportional to
 
 $$
-x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\}, ~ ~ x > 0 .
+x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\}, ~ ~ x > 0,
 $$
+
+and the last element $z_{MM}$ follows a truncated normal with mean zero and variance $\sigma$.
 
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
@@ -220,7 +222,7 @@ ZZ_est_raw_s = normal(0, 1, dim = sum(idx_s))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
-The reason we defined `ZZ_est_raw_` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
+The reason we defined `ZZ_est_raw_?` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
 
 So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top of `ZZ_est` with a 1 for those elements that are to be estimated and a 0 otherwise.
 
