@@ -205,7 +205,7 @@ $$
 x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\}, ~ ~ x > 0,
 $$
 
-and the last element $z_{MM}$ follows a truncated normal with mean zero and variance $\sigma$.
+and the last element follows a truncated normal distribution, such that $z_{MM} \sim \text{TN}(0, \sigma)$.
 
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
