@@ -213,6 +213,10 @@ for(i in 1:MM) {
   }
   ZZ[sample(NN,NN),i] <- round(zz,3)
 }
+
+ZZ <- matrix(runif(NN*MM, -1, 1), NN, MM)
+diag(ZZ) <- abs(diag(ZZ))
+ZZ[upper.tri(ZZ)] <- 0
 ```
 
 ## Observed time series
