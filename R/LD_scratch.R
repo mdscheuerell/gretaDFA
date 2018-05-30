@@ -47,14 +47,28 @@ ld_distribution <- R6Class (
       
     },
     
+    # tf_distrib = function (parameters, dag) {
+    #   
+    #   sigma <- parameters$sigma
+    #   n <- self$dim[1]
+    # 
+    #   const <- fl(n - seq(n))
+    #   
+    #   log_prob = function (x) {
+    #     const * tf$log(x) - x ^ fl(2) / (fl(2) * sigma)
+    #   }
+    #   
+    #   list(log_prob = log_prob, cdf = NULL, log_cdf = NULL)
+    #   
+    # },
+    
     tf_distrib = function (parameters, dag) {
       
       sigma <- parameters$sigma
-      n <- self$dim[1]
-
-      const <- fl(n - seq(n))
       
       log_prob = function (x) {
+        n <- length(x)
+        const <- fl(n - seq(n))
         const * tf$log(x) - x ^ fl(2) / (fl(2) * sigma)
       }
       
@@ -69,12 +83,12 @@ ld_distribution <- R6Class (
   )
 )
 
-z <- ld(sigma = 0.5, dim = 2)
+z <- ld(sigma = 1, dim = 3)
 m <- model(z)
 
-plan(multicore)
+# plan(multicore)
 
-draws <- mcmc(m, chains = 4, n_samples = 5000, warmup = 1000, thin = 10)
+draws <- mcmc(m, chains = 4, n_samples = 2000, warmup = 1000, thin = 10)
 plot(draws)
 
 dd <- do.call(rbind, draws)
