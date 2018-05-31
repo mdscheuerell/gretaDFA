@@ -12,10 +12,12 @@ as.greta_array <- .internals$greta_arrays$as.greta_array
 is_scalar <- .internals$utils$misc$is_scalar
 fl <- .internals$utils$misc$fl
 
+# function to call 
 ld <- function (i, M, C0, dim = 1) {
   distrib("ld", i, M, C0, dim)
   }
 
+# Leung & Drton distn for prior of diag(Z)
 ld_distribution <- R6Class (
   "ld_distribution",
   inherit = distribution_node,
@@ -27,15 +29,35 @@ ld_distribution <- R6Class (
       M <- as.greta_array(M)
       C0 <- as.greta_array(C0)
 
-      if (!is_scalar(C0)) {
-        stop ("C0 must be a scalar, but had dimensions: ",
-              capture.output(dput(dim(eta))),
+      # check if args are positive scalars
+      if (length(i) > 1 || i <= 0 || !is.finite(i) || !is.integer(i)) {
+        
+        stop ("dim must be a scalar positive integer, but was: ",
+              capture.output(dput(i)),
               call. = FALSE)
+        
       }
-
-      # check dim is a positive scalar integer
-      dim_old <- dim
-      dim <- as.integer(dim)
+      if (length(M) > 1 || M <= 0 || !is.finite(M) || !is.integer(M)) {
+        
+        stop ("dim must be a scalar positive integer, but was: ",
+              capture.output(dput(M)),
+              call. = FALSE)
+        
+      }
+      if (length(C0) > 1 || C0 <= 0 || !is.finite(C0) || !is.integer(C0)) {
+        
+        stop ("dim must be a scalar positive integer, but was: ",
+              capture.output(dput(C0)),
+              call. = FALSE)
+        
+      }
+      if (length(dim) > 1 || dim <= 0 || !is.finite(dim) || !is.integer(dim)) {
+        
+        stop ("dim must be a scalar positive integer, but was: ",
+              capture.output(dput(dim)),
+              call. = FALSE)
+        
+      }
       if (length(dim) > 1 || dim <= 0 || !is.finite(dim)) {
 
         stop ("dim must be a scalar positive integer, but was: ",
