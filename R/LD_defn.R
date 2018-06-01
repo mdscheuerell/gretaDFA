@@ -1,8 +1,5 @@
-library (greta)
-
-# library(future)
-
 # a temporary hack to test out the distribution
+library (greta)
 library (R6)
 library (tensorflow)
 distrib <- .internals$nodes$constructors$distrib
