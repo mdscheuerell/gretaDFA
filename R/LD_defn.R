@@ -10,8 +10,8 @@ is_scalar <- .internals$utils$misc$is_scalar
 fl <- .internals$utils$misc$fl
 
 # function to call 
-ld <- function (i, M, C0, dim = 1) {
-  distrib("ld", i, M, C0, dim)
+ld <- function (i, M, sigma, dim = 1) {
+  distrib("ld", i, M, sigma, dim)
   }
 
 # Leung & Drton distn for prior of diag(Z)
@@ -20,7 +20,7 @@ ld_distribution <- R6Class (
   inherit = distribution_node,
   public = list(
     
-    initialize = function (i, M, C0, dim) {
+    initialize = function (i, M, sigma, dim) {
       
       # check if (i, M, dim) are in counting set
       # (i)
@@ -67,27 +67,27 @@ ld_distribution <- R6Class (
         
       }
 
-      # check if C0 is positive real
-      # (C0)
-      if (length(C0) > 1 ||
-          C0 <= 0 ||
-          !is.finite(C0)) {
+      # check if sigma is positive real
+      # (sigma)
+      if (length(sigma) > 1 ||
+          sigma <= 0 ||
+          !is.finite(sigma)) {
         
-        stop ("C0 must be a scalar positive integer, but was: ",
-              capture.output(dput(C0)),
+        stop ("sigma must be a scalar positive integer, but was: ",
+              capture.output(dput(sigma)),
               call. = FALSE)
         
       }
       
       i <- as.greta_array(i)
       M <- as.greta_array(M)
-      C0 <- as.greta_array(C0)
+      sigma <- as.greta_array(sigma)
       
       self$bounds <- c(0, Inf)
       super$initialize("ld", dim, truncation = c(0, Inf))
       self$add_parameter(i, "i")
       self$add_parameter(M, "M")
-      self$add_parameter(C0, "C0")
+      self$add_parameter(sigma, "sigma")
 
     },
     
@@ -95,11 +95,11 @@ ld_distribution <- R6Class (
 
       i <- parameters$i
       M <- parameters$M
-      C0 <- parameters$C0
+      sigma <- parameters$sigma
 
-      # log pdf(x | i, M, C0)
+      # log pdf(x | i, M, sigma)
       log_prob = function (x) {
-        (M - i) * tf$log(x) - x ^ fl(2) / (fl(2) * C0)
+        (M - i) * tf$log(x) - x ^ fl(2) / (fl(2) * sigma)
       }
 
       list(log_prob = log_prob, cdf = NULL, log_cdf = NULL)
@@ -117,7 +117,7 @@ ld_distribution <- R6Class (
 zd <- zeros(M-1)
 for(i in 1:(M-1)) {
   
-  zd[i] <- ld(i, M = M, C0 = 0.5, dim = 1)
+  zd[i] <- ld(i, M = M, sigma = 0.5, dim = 1)
   
 }
 m <- model(zd)
@@ -128,15 +128,15 @@ coda::effectiveSize(draws)
 coda::gelman.diag(draws)
 
 
-zd <- function(M, C0) {
+zd <- function(M, sigma) {
   ## initial greta array
   zd <- zeros(M)
   ## elements 1:(M-1) get L&D prior
   for(i in 1:(M-1)) {
-    zd[i] <- ld(i, M = M, C0 = C0, dim = 1)
+    zd[i] <- ld(i, M = M, sigma = sigma, dim = 1)
   }
   ## element M gets truncated normal
-  zd[M] <- normal(0, C0, truncation = c(0, Inf))
+  zd[M] <- normal(0, sigma, truncation = c(0, Inf))
   return(zd)
 }
 
