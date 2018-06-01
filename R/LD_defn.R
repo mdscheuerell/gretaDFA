@@ -113,6 +113,7 @@ ld_distribution <- R6Class (
   )
 )
 
+M <- 4
 
 zd <- zeros(M-1)
 for(i in 1:(M-1)) {
