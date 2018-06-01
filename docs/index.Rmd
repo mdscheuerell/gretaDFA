@@ -348,33 +348,12 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ZZ_est <- zeros(NN,MM)
 ## define sigma
 sigma = normal(0, 5, truncation = c(0, Inf))
-## diagonal for elements 1:(M-1)
-ZZ_est_raw_d = zd(MM, sigma)
-diag(ZZ_est) <- ZZ_est_raw_d
-## diagonal for element M
-ZZ_est_raw_M = normal(0, sigma, dim = 1, truncation = c(0, Inf))
-ZZ_est[MM,MM] <- ZZ_est_raw_M
+## diagonal
+diag(ZZ_est) = zd(MM, sigma)
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 1, dim = sum(idx_s))
-ZZ_est[idx_s] <- ZZ_est_raw_s
+ZZ_est[idx_s] = normal(0, 1, dim = sum(idx_s))
 ```
-
-The reason we defined `ZZ_est_raw_?` separately here, rather than directly assigning values to `ZZ_est` is so that we can use the `evaluate()` function to verify its contents. With `evaluate()`, we can calculate the value of a greta array by passing a fixed value for those it depends on.
-
-So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of `ZZ_est` with the following values:
-
- * a 1 for the 1:(M-1) diagonal elements;
- * a 2 for the M^th^ diagonal element; and
- * a 3 for all of the subdiagonal elements.
-
-```{r demo_evaluate, cache=TRUE}
-head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
-                            ZZ_est_raw_M = matrix(2),
-                            ZZ_est_raw_s = rep(3, sum(idx_s)))))
-```
-
-It looks like everything worked as expected.
 
 ### Covariance matrix
 
