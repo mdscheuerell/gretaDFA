@@ -351,9 +351,9 @@ ZZ_est <- zeros(NN,MM)
 ## define sigma
 sigma = normal(0, 5, truncation = c(0, Inf))
 ## diagonal for elements 1:(M-1)
-idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
+# idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
 ZZ_est_raw_d = zd(MM, sigma)
-ZZ_est[idx_d] <- ZZ_est_raw_d
+diag(ZZ_est) <- ZZ_est_raw_d
 ## diagonal for element M
 ZZ_est_raw_M = normal(0, sigma, dim = 1, truncation = c(0, Inf))
 ZZ_est[MM,MM] <- ZZ_est_raw_M
