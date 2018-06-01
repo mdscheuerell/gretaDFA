@@ -105,15 +105,15 @@ cumsum_mat <- function(x, a=1L) {
 The second will fill in the diagonal of the prior for the loadings matrix $\mathbf{Z}$ with the appropriate distribution.
 
 ```{r}
-zd <- function(M, C0) {
+zd <- function(M, sigma) {
   ## initial greta array
   zd <- zeros(M)
   ## elements 1:(M-1) get L&D prior
   for(i in 1:(M-1)) {
-    zd[i] <- ld(i, M = M, C0 = C0, dim = 1)
+    zd[i] <- ld(i, M = M, sigma = sigma, dim = 1)
   }
   ## element M gets truncated normal
-  zd[M] <- normal(0, C0, truncation = c(0, Inf))
+  zd[M] <- normal(0, sigma, truncation = c(0, Inf))
   return(zd)
 }
 ```
@@ -128,8 +128,8 @@ is_scalar <- .internals$utils$misc$is_scalar
 fl <- .internals$utils$misc$fl
 
 # function to call 
-ld <- function (i, M, C0, dim = 1) {
-  distrib("ld", i, M, C0, dim)
+ld <- function (i, M, sigma, dim = 1) {
+  distrib("ld", i, M, sigma, dim)
   }
 
 # Leung & Drton distn for prior of diag(Z)
@@ -138,7 +138,7 @@ ld_distribution <- R6Class (
   inherit = distribution_node,
   public = list(
     
-    initialize = function (i, M, C0, dim) {
+    initialize = function (i, M, sigma, dim) {
       
       # check if (i, M, dim) are in counting set
       # (i)
@@ -185,27 +185,27 @@ ld_distribution <- R6Class (
         
       }
 
-      # check if C0 is positive real
-      # (C0)
-      if (length(C0) > 1 ||
-          C0 <= 0 ||
-          !is.finite(C0)) {
+      # check if sigma is positive real
+      # (sigma)
+      if (length(sigma) > 1 ||
+          sigma <= 0 ||
+          !is.finite(sigma)) {
         
-        stop ("C0 must be a scalar positive integer, but was: ",
-              capture.output(dput(C0)),
+        stop ("sigma must be a scalar positive integer, but was: ",
+              capture.output(dput(sigma)),
               call. = FALSE)
         
       }
       
       i <- as.greta_array(i)
       M <- as.greta_array(M)
-      C0 <- as.greta_array(C0)
+      sigma <- as.greta_array(sigma)
       
       self$bounds <- c(0, Inf)
       super$initialize("ld", dim, truncation = c(0, Inf))
       self$add_parameter(i, "i")
       self$add_parameter(M, "M")
-      self$add_parameter(C0, "C0")
+      self$add_parameter(sigma, "sigma")
 
     },
     
@@ -213,11 +213,11 @@ ld_distribution <- R6Class (
 
       i <- parameters$i
       M <- parameters$M
-      C0 <- parameters$C0
+      sigma <- parameters$sigma
 
-      # log pdf(x | i, M, C0)
+      # log pdf(x | i, M, sigma)
       log_prob = function (x) {
-        (M - i) * tf$log(x) - x ^ fl(2) / (fl(2) * C0)
+        (M - i) * tf$log(x) - x ^ fl(2) / (fl(2) * sigma)
       }
 
       list(log_prob = log_prob, cdf = NULL, log_cdf = NULL)
@@ -269,15 +269,15 @@ The matrix $\mathbf{Z}$ maps the factors $\mathbf{x}$ onto the observations $\ma
 
 ```{r create_Z}
 ## NN x MM loadings matrix
-ZZ <- matrix(NA, NN, MM)
-LL <- seq(-1,1,length.out=MM+1)
-for(i in 1:MM) {
-  zz <- NULL
-  for(j in 1:MM) {
-    zz <- c(zz,runif(NN/MM,LL[j],LL[j+1]))
-  }
-  ZZ[sample(NN,NN),i] <- round(zz,3)
-}
+# ZZ <- matrix(NA, NN, MM)
+# LL <- seq(-1,1,length.out=MM+1)
+# for(i in 1:MM) {
+#   zz <- NULL
+#   for(j in 1:MM) {
+#     zz <- c(zz,runif(NN/MM,LL[j],LL[j+1]))
+#   }
+#   ZZ[sample(NN,NN),i] <- round(zz,3)
+# }
 
 ZZ <- matrix(runif(NN*MM, -1, 1), NN, MM)
 diag(ZZ) <- abs(diag(ZZ))
@@ -352,7 +352,7 @@ ZZ_est <- zeros(NN,MM)
 sigma = normal(0, 5, truncation = c(0, Inf))
 ## diagonal for elements 1:(M-1)
 idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
-ZZ_est_raw_d = ld(sigma, MM-1)
+ZZ_est_raw_d = zd(MM, sigma)
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## diagonal for element M
 ZZ_est_raw_M = normal(0, sigma, dim = 1, truncation = c(0, Inf))
