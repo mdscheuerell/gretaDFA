@@ -100,6 +100,7 @@ ld_distribution <- R6Class (
       M <- parameters$M
       C0 <- parameters$C0
 
+      # log pdf(x | i, M, C0)
       log_prob = function (x) {
         (M - i) * tf$log(x) - x ^ fl(2) / (fl(2) * C0)
       }
@@ -128,4 +129,21 @@ plot(draws)
 
 coda::effectiveSize(draws)
 coda::gelman.diag(draws)
+
+
+zd <- function(M, C0) {
+  ## initial greta array
+  zd <- zeros(M)
+  ## elements 1:(M-1) get L&D prior
+  for(i in 1:(M-1)) {
+    zd[i] <- ld(i, M = M, C0 = C0, dim = 1)
+  }
+  ## element M gets truncated normal
+  zd[M] <- normal(0, C0, truncation = c(0, Inf))
+  return(zd)
+}
+
+m <- model(zd(4, 1))
+draws <- mcmc(m, chains = 4, n_samples = 2500, warmup = 500, thin = 10)
+plot(draws)
 
