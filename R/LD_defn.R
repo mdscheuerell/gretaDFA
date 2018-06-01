@@ -127,7 +127,6 @@ plot(draws)
 coda::effectiveSize(draws)
 coda::gelman.diag(draws)
 
-
 zd <- function(M, sigma) {
   ## initial greta array
   zd <- zeros(M)
