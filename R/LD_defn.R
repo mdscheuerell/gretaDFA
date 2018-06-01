@@ -25,46 +25,66 @@ ld_distribution <- R6Class (
     
     initialize = function (i, M, C0, dim) {
       
-      i <- as.greta_array(i)
-      M <- as.greta_array(M)
-      C0 <- as.greta_array(C0)
-
-      # check if args are positive scalars
-      if (length(i) > 1 || i <= 0 || !is.finite(i) || !is.integer(i)) {
+      # check if (i, M, dim) are in counting set
+      # (i)
+      if (length(i) > 1 ||
+          i <= 0 ||
+          !is.finite(i) ||
+          i != floor(i)) {
         
-        stop ("dim must be a scalar positive integer, but was: ",
+        stop ("i must be a scalar positive integer, but was: ",
               capture.output(dput(i)),
               call. = FALSE)
         
       }
-      if (length(M) > 1 || M <= 0 || !is.finite(M) || !is.integer(M)) {
+      
+      # (M)
+      if (length(M) > 1 ||
+          M <= 0 ||
+          !is.finite(M) ||
+          M != floor(M)) {
         
-        stop ("dim must be a scalar positive integer, but was: ",
+        stop ("M must be a scalar positive integer, but was: ",
               capture.output(dput(M)),
               call. = FALSE)
         
       }
-      if (length(C0) > 1 || C0 <= 0 || !is.finite(C0) || !is.integer(C0)) {
-        
-        stop ("dim must be a scalar positive integer, but was: ",
-              capture.output(dput(C0)),
-              call. = FALSE)
-        
-      }
-      if (length(dim) > 1 || dim <= 0 || !is.finite(dim) || !is.integer(dim)) {
+      
+      # (dim)
+      if (length(dim) > 1 ||
+          dim <= 0 ||
+          !is.finite(dim) ||
+          dim != floor(dim)) {
         
         stop ("dim must be a scalar positive integer, but was: ",
               capture.output(dput(dim)),
               call. = FALSE)
         
       }
-      if (length(dim) > 1 || dim <= 0 || !is.finite(dim)) {
-
-        stop ("dim must be a scalar positive integer, but was: ",
-              capture.output(dput(dim_old)),
+      
+      # check if M > i
+      if (M - i < 1) {
+        
+        stop ("i can be no larger than M - 1",
               call. = FALSE)
-
+        
       }
+
+      # check if C0 is positive real
+      # (C0)
+      if (length(C0) > 1 ||
+          C0 <= 0 ||
+          !is.finite(C0)) {
+        
+        stop ("C0 must be a scalar positive integer, but was: ",
+              capture.output(dput(C0)),
+              call. = FALSE)
+        
+      }
+      
+      i <- as.greta_array(i)
+      M <- as.greta_array(M)
+      C0 <- as.greta_array(C0)
       
       self$bounds <- c(0, Inf)
       super$initialize("ld", dim, truncation = c(0, Inf))
