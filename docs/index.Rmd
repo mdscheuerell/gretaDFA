@@ -118,7 +118,7 @@ zd <- function(M, sigma) {
 }
 ```
 
-```{r, echo = FALSE}
+```{r define_ld_distrib, echo = FALSE}
 library (R6)
 distrib <- .internals$nodes$constructors$distrib
 distribution_node <- .internals$nodes$node_classes$distribution_node
@@ -185,11 +185,9 @@ ld_distribution <- R6Class (
         
       }
 
-      # check if sigma is positive real
+      # check if sigma is scalar
       # (sigma)
-      if (length(sigma) > 1 ||
-          sigma <= 0 ||
-          !is.finite(sigma)) {
+      if (length(sigma) > 1) {
         
         stop ("sigma must be a scalar positive integer, but was: ",
               capture.output(dput(sigma)),
@@ -351,7 +349,6 @@ ZZ_est <- zeros(NN,MM)
 ## define sigma
 sigma = normal(0, 5, truncation = c(0, Inf))
 ## diagonal for elements 1:(M-1)
-# idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
 ZZ_est_raw_d = zd(MM, sigma)
 diag(ZZ_est) <- ZZ_est_raw_d
 ## diagonal for element M
