@@ -259,16 +259,17 @@ yy_z <- t(scale(t(yy)))
 ## vectorize data
 yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
-Zx_vec <- c(ZZ_est %*% xx_est)
+Zx_vec <- t(c(ZZ_est %*% xx_est))
 ## create expanded cov matrix
-RR_star <- zeros(NN*TT, NN*TT)
-diag(RR_star) <- rep(RR_est_raw, NN*TT)
+# RR_star <- zeros(NN*TT, NN*TT)
+# diag(RR_star) <- rep(RR_est_raw, NN*TT)
 ## define likelihood
-distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
+# distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
+distribution(yy_vec) = normal(Zx_vec, RR_est_raw)
 
 ## ----greta_model, cache=TRUE---------------------------------------------
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 1000, thin = 1, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 2000,
                   chains = 1, verbose = FALSE)
 
 ## ----traceplots, fig.height=5, fig.width=7-------------------------------
