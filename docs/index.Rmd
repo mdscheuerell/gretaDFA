@@ -378,9 +378,9 @@ The reason we defined `ZZ_est_raw_?` separately here, rather than directly assig
 
 So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of `ZZ_est` with the following values:
 
- * a 1 for the 1:(M-1) diagonal elements;
- * a 2 for the M^th^ diagonal element; and
- * a 3 for all of the subdiagonal elements.
+ * 1 for the 1:(M-1) diagonal elements;
+ * 2 for the M^th^ diagonal element; and
+ * 3 for all of the subdiagonal elements.
 
 ```{r demo_evaluate, cache=TRUE}
 head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
