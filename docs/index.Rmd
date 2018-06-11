@@ -287,8 +287,10 @@ ZZ[upper.tri(ZZ)] <- 0
 Now we can use the loadings and some observation errors to create the observed time series. Here we assume that the errors are IID, and their variance is 0.2. We can ignore the additive effect of the offset vector $\mathbf{a}$ because the expectations of $\mathbf{x}$ and $\mathbf{e}$ are both zero.
 
 ```{r create_ts}
+## obs var
+obs_var <- 0.2
 ## obs errors
-ee <- t(mvrnorm(TT, matrix(0,NN,1), diag(0.2,NN,NN)))
+ee <- t(mvrnorm(TT, matrix(0,NN,1), diag(obs_var,NN,NN)))
 ## NN x TT matrix of observed data
 yy <- ZZ %*% xx + ee
 ```
@@ -359,8 +361,8 @@ ZZ_est[idx_s] = normal(0, 1, dim = sum(idx_s))
 ## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
 ## define sigma
-# sigma = normal(0, 5, truncation = c(0, Inf))
-sigma <- 1
+sigma = normal(0, 5, truncation = c(0, Inf))
+# sigma <- 1
 ## diagonal for elements 1:(M-1)
 idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
 ZZ_est_raw_d = zd(MM, sigma)
@@ -398,7 +400,7 @@ We will scale the observations before fitting, so the maximum variance of the ob
 
 ```{r priors_obs_cov}
 ## diagonal of R
-RR_est_raw = student(10, 0, 1, truncation=c(0, Inf))
+RR_est_raw = student(10, 0, 1, truncation=c(0, 1))
 ```
 
 ## Specify likelihoods
@@ -445,9 +447,9 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 1000, thin = 1, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 2, warmup = 1000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 1, Lmax = 100, epsilon = 0.05))
+                  hmc(Lmin = 2, Lmax = 100, epsilon = 0.05))
 ```
 
 # Assessing convergence
@@ -538,7 +540,7 @@ round(ZZ_rot, 2)
 Here are the `r MM` factors in $\mathbf{x}$. The top panel has the true factors; the bottom panel shows the estimated factors. Note that there is no way to insure that the specific ordering of the estimated factors will match the true factors.
 
 ```{r get_factors}
-# fitted factors
+## fitted factors
 xx_fit <- par_means[grepl("xx",rownames(mod_smry$statistics))]
 xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
 ```
@@ -564,7 +566,7 @@ corrplot(cor(t(xx), t(xx_fit)), method="ellipse",
 
 ## Covariance matrix
 
-Here is an estimated of the observation variance.
+Here is an estimate of the observation variance (recall that the true value is `r obs_var`).
 
 ```{r get_RR_fit}
 RR_fit <- par_means[grepl("RR",rownames(mod_smry$statistics))]
@@ -577,7 +579,7 @@ Here is a graphical representation of the correlation between the observed and f
 
 ```{r cor_yy}
 ## fitted values
-yy_fit <- ZZ_rot %*% xx
+yy_fit <- ZZ_fit %*% xx_fit
 ## corrrelation
 cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/10, 10)
 ## plots
@@ -585,5 +587,5 @@ par(mai=rep(0.1, 4), omi=rep(0.1, 4))
 corrplot(cor_yy, method="ellipse",
          tl.pos = "n",
          cl.cex = 0.8, cl.offset = 0.9,
-         cl.ratio = 0.2, )#cl.lim = c(0, 1))
+         cl.ratio = 0.2) #cl.lim = c(0, 1))
 ```
