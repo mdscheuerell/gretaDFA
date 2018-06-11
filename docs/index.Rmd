@@ -360,7 +360,7 @@ ZZ_est[idx_s] = normal(0, 1, dim = sum(idx_s))
 ZZ_est <- zeros(NN,MM)
 ## define sigma
 # sigma = normal(0, 5, truncation = c(0, Inf))
-sigma <- 3
+sigma <- 1
 ## diagonal for elements 1:(M-1)
 idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
 ZZ_est_raw_d = zd(MM, sigma)
@@ -388,8 +388,8 @@ head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
                             ZZ_est_raw_s = rep(3, sum(idx_s)))))
 ```
 
- 
 It looks like everything worked as expected.
+
 ### Covariance matrix
 
 Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so we could model them as a set of univariate normals, but we will keep the code general enough to allow for possible covariance(s).
@@ -430,12 +430,13 @@ yy_z <- t(scale(t(yy)))
 ## vectorize data
 yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
-Zx_vec <- c(ZZ_est %*% xx_est)
+Zx_vec <- t(c(ZZ_est %*% xx_est))
 ## create expanded cov matrix
-RR_star <- zeros(NN*TT, NN*TT)
-diag(RR_star) <- rep(RR_est_raw, NN*TT)
+# RR_star <- zeros(NN*TT, NN*TT)
+# diag(RR_star) <- rep(RR_est_raw, NN*TT)
 ## define likelihood
-distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
+# distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
+distribution(yy_vec) = normal(Zx_vec, RR_est_raw)
 ```
 
 ## Fit the model
