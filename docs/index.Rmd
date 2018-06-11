@@ -7,6 +7,8 @@ output:
     toc_float: true
     toc_depth: 3
     fig_caption: yes
+csl: JApplEcol.csl
+bibliography: index.bib
 ---
 
 
@@ -447,9 +449,9 @@ Now we can define the complete model and do some MCMC sampling.
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 2, warmup = 1000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 2, warmup = 2000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 2, Lmax = 100, epsilon = 0.05))
+                  hmc(Lmin = 1, Lmax = 50, epsilon = 0.01))
 ```
 
 # Assessing convergence
@@ -589,3 +591,5 @@ corrplot(cor_yy, method="ellipse",
          cl.cex = 0.8, cl.offset = 0.9,
          cl.ratio = 0.2) #cl.lim = c(0, 1))
 ```
+
+# References
