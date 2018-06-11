@@ -358,8 +358,9 @@ ZZ_est[idx_s] = normal(0, 1, dim = sum(idx_s))
 ```{r priors_loadings}
 ## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
-## definea sigma
-sigma = normal(0, 5, truncation = c(0, Inf))
+## define sigma
+# sigma = normal(0, 5, truncation = c(0, Inf))
+sigma <- 3
 ## diagonal for elements 1:(M-1)
 idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
 ZZ_est_raw_d = zd(MM, sigma)
