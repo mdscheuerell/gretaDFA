@@ -341,7 +341,7 @@ $$
 Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ where $i \leq (M - 1)$ has density proportional to
 
 $$
-x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\}, ~ ~ x > 0,
+x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\} ~ \forall ~  x > 0,
 $$
 
 and the last element follows a truncated normal distribution, such that $z_{MM} \sim \text{TN}(0, \sigma)$.
