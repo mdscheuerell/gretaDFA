@@ -609,4 +609,14 @@ corrplot(cor_yy, method="ellipse",
          cl.ratio = 0.2) #cl.lim = c(0, 1))
 ```
 
+## Sigma
+
+Here is an estimate of the scale parameter for the diagonal of $\mathbf{Z}$.
+
+```{r get_Sigma_fit}
+sigma_fit <- par_means["sigma"]
+round(sigma_fit, 2)
+```
+
+
 # References
