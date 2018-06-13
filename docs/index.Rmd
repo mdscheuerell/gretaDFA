@@ -445,9 +445,9 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 20000, thin = 20, warmup = 5000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 50000, thin = 50, warmup = 20000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 1, Lmax = 50, epsilon = 0.1, diag_sd = 0.1))
+                  hmc(Lmin = 1, Lmax = 50, epsilon = 0.005, diag_sd = 0.1))
 ```
 
 ```{r stop_timer, include=FALSE}
