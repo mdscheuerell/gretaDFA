@@ -352,7 +352,7 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
 ## define sigma
-sigma = normal(0, 10, truncation = c(0, Inf))
+sigma = normal(0, 2, truncation = c(0, Inf))
 # sigma <- 1
 ## diagonal
 ZZ_est_raw_d = zd(MM, sigma)
@@ -440,10 +440,10 @@ timer_start <- proc.time()
 ```
 
 ```{r greta_model, cache=TRUE}
-mod_fit <- model(xx_est, ZZ_est, RR_est_raw)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 1000,
+mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
+mcmc_smpl <- mcmc(mod_fit, n_samples = 2000, thin = 1, warmup = 2000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 15, Lmax = 25, epsilon = 0.05, diag_sd = 1))
+                  hmc(Lmin = 10, Lmax = 100, epsilon = 0.05, diag_sd = 1))
 ```
 
 ```{r stop_timer, include=FALSE}
@@ -597,7 +597,7 @@ corrplot(cor_yy, method="ellipse",
 
 Here is an estimate of the scale parameter for the diagonal of $\mathbf{Z}$.
 
-```{r get_Sigma_fit, eval=FALSE}
+```{r get_Sigma_fit}
 sigma_fit <- par_means["sigma"]
 round(sigma_fit, 2)
 ```
