@@ -27,13 +27,13 @@ _Quantitative and Applied Ecology Group, School of BioSciences, University of Me
 
 ***
 
-This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
-
-***
-
 __DISCLAIMER__  
 
 This vignette is still in the testing and evaluating phase and should not be considered complete or error-free.
+
+This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
+
+***
 
 # Background
 
@@ -55,11 +55,11 @@ The factors are modeled as random walks where the covariance matrix $\mathbf{Q}$
 
 # Why __greta__?
 
-Estimating the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [__MARSS__](https://cran.r-project.org/web/packages/MARSS/index.html) package. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
+Estimating the parameters in a DFA model is not trivial. There are several available methods for doing so, including an EM algorithm as implemented in the [__MARSS__](https://cran.r-project.org/web/packages/MARSS/index.html) package [@pkg_MARSS]. However, the fitting process can be extremely slow when working with really large data sets (e.g., 50+ time series).
 
-For example, a couple of years ago MDS helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on estimates of daily growth rates for juvenile Chinook salmon. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with __MARSS__ using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
+For example, a couple of years ago MDS helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on estimates of daily growth rates for juvenile Chinook salmon [@goertler2016]. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with __MARSS__ using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
 
-The [__greta__](https://greta-dev.github.io/greta/) package was designed by NG to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal __R__ syntax.
+The [__greta__](https://greta-dev.github.io/greta/) package [@pkg_greta] to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal __R__ syntax.
 
 # Requirements
 
