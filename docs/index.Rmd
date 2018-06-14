@@ -265,20 +265,9 @@ matplot(t(xx), type="b", lty="solid", cex=0.7,
 
 ## Loadings matrix
 
-The matrix $\mathbf{Z}$ maps the factors $\mathbf{x}$ onto the observations $\mathbf{y}$. We want some of the time series to look more like one another than others, so we randomly draw the loadings from a uniform range of values within specific blocks. (Note that this bit of code only works if `NN %% MM == 0`.)
+The matrix $\mathbf{Z}$ maps the factors $\mathbf{x}$ onto the observations $\mathbf{y}$. We draw each of the sub-diagonal elements from a Uniform(-1,1); the diagonal elements are drawn from a Uniform(0,1). We also sort the diagonal elements from largest to smallest.
 
 ```{r create_Z}
-## NN x MM loadings matrix
-# ZZ <- matrix(NA, NN, MM)
-# LL <- seq(-1,1,length.out=MM+1)
-# for(i in 1:MM) {
-#   zz <- NULL
-#   for(j in 1:MM) {
-#     zz <- c(zz,runif(NN/MM,LL[j],LL[j+1]))
-#   }
-#   ZZ[sample(NN,NN),i] <- round(zz,3)
-# }
-
 ZZ <- matrix(runif(NN*MM, -1, 1), NN, MM)
 diag(ZZ) <- rev(sort(abs(diag(ZZ))))
 ZZ[upper.tri(ZZ)] <- 0
@@ -323,28 +312,25 @@ Before we can estimate the model parameters we need to specify distributions for
 
 ### Loadings matrix
 
-To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 4 then 
+To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 3 then 
 
 $$
 \mathbf{Z} = 
 \begin{bmatrix}
-    z_{11} & 0      & 0 & 0 \\
-    z_{21} & z_{22} & 0 & 0 \\
-    z_{31} & z_{32} & z_{33} & 0 \\
-    z_{41} & z_{42} & z_{43} & z_{44} \\
-    z_{51} & z_{52} & z_{53} & z_{54} \\
-    \vdots & \vdots & \vdots & \vdots \\
-    z_{N1} & z_{N2} & z_{N3} & z_{N4} 
+    z_{11} & 0      & 0 \\
+    z_{21} & z_{22} & 0 \\
+    z_{31} & z_{32} & z_{33} \\
+    z_{41} & z_{42} & z_{43} \\
+    \vdots & \vdots & \vdots \\
+    z_{N1} & z_{N2} & z_{N3}  
 \end{bmatrix}.   
 $$
 
-Second, when estimating a DFA model in a Bayesian framework, as we are with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ where $i \leq (M - 1)$ has density proportional to
+Second, when estimating a DFA model in a Bayesian framework, as with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ has density proportional to
 
 $$
-x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\} ~ \forall ~  x > 0,
+x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\} ~ \forall ~  x > 0.
 $$
-
-and the last element follows a truncated normal distribution, such that $z_{MM} \sim \text{TN}(0, \sigma)$.
 
 Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to be estimated, and which should be fixed at 0. The order of operations is important here because __greta__ does not allow you to reassign elements in an array to fixed values after they have been declared as random. (Note that we follow the __greta__ convention of using the `=` assignment for stochastic nodes.)
 
@@ -441,7 +427,7 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 10000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 5000,
                   chains = 1, verbose = FALSE,
                   hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
 ```
@@ -560,11 +546,13 @@ xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
 ```{r plot_xx_fits, fig.height=7, fig.width=7, echo=FALSE}
 par(mfrow=c(2,1), mai=c(0.8,0.8,0.2,0.2))
 matplot(t(xx), type="b", lty="solid", cex=0.7,
-        xlab="Time", ylab=expression(italic(x)[italic(t)]),
+        xlab="", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
+mtext("True", 3, adj = 0)
 matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=viridis(MM, end=0.8))
+mtext("Fitted", 3, adj = 0)
 ```
 
 Here is a graphical representation of the pairwise correlation between the factors.
