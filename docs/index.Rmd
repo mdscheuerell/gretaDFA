@@ -416,9 +416,10 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 5000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 50000, thin = 50, warmup = 10000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
+                  hmc(Lmin = 10, Lmax = 100, epsilon = 0.05, diag_sd = 1))
+saveRDS(mcmc_smpl, "DFA_mcmc_smpl.rds")
 ```
 
 ```{r stop_timer, include=FALSE}
@@ -433,18 +434,16 @@ It is important to determine whether or not the model has converged before we ca
 
 ## Traceplots
 
-One quick option is to visually inspect the MCMC traces with `traceplot()` from the __coda__ package. Because the output is so voluminous, we only show them for the first 4 estimates.
+One quick option is to visually inspect the MCMC traces with `traceplot()` from the __coda__ package. Here is a matrix of traces for the elements in $\mathbf{Z}$.
 
-```{r traceplots, fig.height=5, fig.width=7}
-par(mfrow=c(2,2), mai=c(0.8,0.5,0.2,0.2))
-for(i in 1:4) {
-  coda::traceplot(mcmc_smpl[[1]][,i]) 
+```{r traceplots_Z, fig.height=15, fig.width=7}
+par(mfrow=c(NN,MM), mai=rep(0,4), omi=rep(0,4))
+for(i in 1:NN) {
+	for(j in 1:MM) {
+		coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
+		ylab="", xlab="", yaxt="n", xaxt="n")
+	}
 }
-```
-
-```{r bayesplot, fig.height=5, fig.width=7, eval=FALSE, echo=FALSE}
-par(mai=c(0.8,0.5,0.2,0.2))
-bayesplot::mcmc_trace(as.matrix(mcmc_smpl[[1]][,1:4]))
 ```
 
 These chains clearly show evidence of nonconvergence and also some autocorrelation, suggesting we need to use a longer burnin period and perhaps some thinning as well.
