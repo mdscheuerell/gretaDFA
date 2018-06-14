@@ -7,7 +7,7 @@ output:
     toc_float: true
     toc_depth: 3
     fig_caption: yes
-csl: JApplEcol.csl
+csl: index.csl
 bibliography: index.bib
 ---
 
@@ -59,7 +59,7 @@ Estimating the parameters in a DFA model is not trivial. There are several avail
 
 For example, a couple of years ago MDS helped a graduate student with a [DFA analysis](https://doi.org/10.1371/journal.pone.0162121) based on estimates of daily growth rates for juvenile Chinook salmon [@goertler2016]. She had 100+ time series from four different year/month combinations, each of which was about 40-180 days long. We fit our models with __MARSS__ using a distributed cluster from [Domino](https://www.dominodatalab.com/), but the models still took days to converge.
 
-The [__greta__](https://greta-dev.github.io/greta/) package [@pkg_greta] to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal __R__ syntax.
+The [__greta__](https://greta-dev.github.io/greta/) package [@pkg_greta] is designed to do [Hamiltonian Monte Carlo](http://onlinelibrary.wiley.com/doi/10.1111/2041-210X.12681/full) via Google's [TensorFlow](https://www.tensorflow.org/) computational engine, which makes it really fast on big datasets. It's also nice because you write the models using normal __R__ syntax.
 
 # Requirements
 
@@ -558,8 +558,7 @@ corrplot(cor(t(xx), t(xx_fit)), method="ellipse",
 Here is an estimate of the SD of the observation errors (recall that the true value is `r sqrt(obs_var)`).
 
 ```{r get_RR_fit}
-RR_fit <- par_means[grepl("RR",rownames(mod_smry$statistics))]
-round(RR_fit, 2)
+round(par_means[grepl("RR",rownames(mod_smry$statistics))], 3)
 ```
 
 ## Fitted vs observed
