@@ -108,14 +108,10 @@ The second will fill in the diagonal of the prior for the loadings matrix $\math
 
 ```{r}
 zd <- function(M, sigma) {
-  ## initial greta array
   zd <- zeros(M)
-  ## elements 1:(M-1) get L&D prior
   for(i in 1:M) {
     zd[i] <- ld(i, M = M, sigma = sigma, dim = 1)
   }
-  ## element M gets truncated normal
-  # zd[M] <- normal(0, sigma, truncation = c(0, Inf))
   return(zd)
 }
 ```
@@ -312,7 +308,7 @@ Before we can estimate the model parameters we need to specify distributions for
 
 ### Loadings matrix
 
-To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right section of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 3 then 
+To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right triangle of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 3 then 
 
 $$
 \mathbf{Z} = 
@@ -338,10 +334,9 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
 ## define sigma
-sigma = normal(0, 2, truncation = c(0, Inf))
-# sigma <- 1
+sigma_est = normal(0, 2, truncation = c(0, Inf))
 ## diagonal
-ZZ_est_raw_d = zd(MM, sigma)
+ZZ_est_raw_d = zd(MM, sigma_est)
 # ZZ_est_raw_d = normal(0, 10, MM, truncation = c(0,1))
 idx_d <- row(ZZ_est) == col(ZZ_est)
 ZZ_est[idx_d] <- ZZ_est_raw_d
@@ -367,15 +362,13 @@ It looks like everything worked as expected.
 
 ### Covariance matrix
 
-Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so we could model them as a set of univariate normals, but we will keep the code general enough to allow for possible covariance(s).
+Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so model them as a set of univariate normals.
 
-We will scale the observations before fitting, so the maximum variance of the observation errors is 1. Thus, we'll use a half-cauchy prior on the observation variance with a scale of 5 and truncate the upper end of the distribution at 1.
+We will scale the observations before fitting, so the maximum variance of the observation errors is 1. Thus, we'll use an inverse gamma prior on the observation variance and truncate the upper end of the distribution at 1.
 
 ```{r priors_obs_cov}
 ## diagonal of R
-# RR_est_raw = student(10, 0, 1, truncation=c(0, 1))
-# RR_est_raw = cauchy(0, 5, 1, truncation=c(0, 1))
-RR_est_raw = inverse_gamma(1, 3, 1, truncation=c(0, 1))
+RR_est = inverse_gamma(alpha = 1, beta = 3, 1, truncation=c(0, 1))
 ```
 
 ## Specify likelihoods
@@ -397,7 +390,7 @@ xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
 
 ### Observed data
 
-__greta__ requires a specification for the mean and variance of the multivariate normal distribution. However, rather than draw time-specific samples we will instead 1) create $NT \times 1$ vectors of the data $\mathbf{y}$ and their expectations $\mathbf{Z} \mathbf{x}$; and 2) create an $NT \times NT$ covariance matrix based on $T$ replicates of $\mathbf{R}$ along the diagonal.
+Because we assumed IID errors for the observations, we can make use of the vectorized form for `normal()` in __greta__ by passing in vectors of the observed data `yy_vec` and their expectation `Zx_vec`, and the scalar variance `RR_est`. 
 
 Note that we will scale each of the $\mathbf{y}_i$ time series in $\mathbf{y}$ to have unit variance so we won't have to estimate $\mathbf{a}$.
 
@@ -408,12 +401,8 @@ yy_z <- t(scale(t(yy), scale = FALSE))
 yy_vec <- as_data(matrix(yy_z, 1, NN*TT))
 ## vectorize mean
 Zx_vec <- t(c(ZZ_est %*% xx_est))
-## create expanded cov matrix
-# RR_star <- zeros(NN*TT, NN*TT)
-# diag(RR_star) <- rep(RR_est_raw, NN*TT)
 ## define likelihood
-# distribution(yy_vec) = multivariate_normal(Zx_vec, RR_star)
-distribution(yy_vec) = normal(Zx_vec, RR_est_raw)
+distribution(yy_vec) = normal(Zx_vec, RR_est)
 ```
 
 ## Fit the model
@@ -426,7 +415,7 @@ timer_start <- proc.time()
 ```
 
 ```{r greta_model, cache=TRUE}
-mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
+mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
 mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 5000,
                   chains = 1, verbose = FALSE,
                   hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
@@ -595,7 +584,7 @@ corrplot(cor_yy, method="ellipse",
 Here is an estimate of the scale parameter for the diagonal of $\mathbf{Z}$.
 
 ```{r get_Sigma_fit}
-sigma_fit <- par_means["sigma"]
+sigma_fit <- par_means["sigma_est"]
 round(sigma_fit, 2)
 ```
 
