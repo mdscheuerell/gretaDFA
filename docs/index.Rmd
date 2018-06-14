@@ -441,7 +441,7 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 5000, thin = 5, warmup = 5000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 10000,
                   chains = 1, verbose = FALSE,
                   hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
 ```
@@ -502,7 +502,7 @@ par_means <- mod_smry$statistics[,"Mean"]
 
 ## Loadings matrix
 
-Here are the fitted versus observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$.
+Here are graphical representations of the correlation between the fitted and observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$. (_Note that cases where the correlation is negative occur when the sampler starts in a complimentary space._)
 
 ```{r get_ZZ_fit}
 ## fitted Z
@@ -562,12 +562,12 @@ par(mfrow=c(2,1), mai=c(0.8,0.8,0.2,0.2))
 matplot(t(xx), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
-matplot(t(xx_fit), type="l", lty="solid", cex=0.7,
+matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=viridis(MM, end=0.8))
 ```
 
-It's difficult to see which factors, if any, align with one another, so here is a graphical representation of their correlation.
+Here is a graphical representation of the pairwise correlation between the factors.
 
 ```{r corrplot_xx, fig.height=6, fig.width=6}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
@@ -593,7 +593,7 @@ Here is a graphical representation of the correlation between the observed and f
 ## fitted values
 yy_fit <- ZZ_fit %*% xx_fit
 ## corrrelation
-cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/10, 10)
+cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/5, 5)
 ## plots
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
 corrplot(cor_yy, method="ellipse",
