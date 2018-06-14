@@ -502,6 +502,21 @@ par_means <- mod_smry$statistics[,"Mean"]
 
 ## Loadings matrix
 
+Here are the fitted versus observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$.
+
+```{r get_ZZ_fit}
+## fitted Z
+ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
+ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+## plot
+par(mai=rep(0.1, 4), omi=rep(0.1, 4))
+corrplot(cor(ZZ, ZZ_fit), method="ellipse",
+         tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
+         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
+```
+
+### Factor rotation
+
 Recall that we constrained $\mathbf{Z}$ in such a way as to choose only one of many possible solutions, but fortunately they are equivalent and can be related to each other by a rotation matrix. Let $\mathbf{H}$ be any $m \times m$ non-singular matrix.  The following are then equivalent DFA models:
 
 $$
@@ -524,13 +539,7 @@ There are many ways of doing factor rotations, but a common method is the "varim
  
 The varimax rotation is easy to compute because R has a built in function for this: `varimax()`. Interestingly, the function returns the inverse of $\mathbf{H}$, which we need anyway.  
 
-```{r get_ZZ_fit}
-## true Z
-ZZ
-## fitted Z
-ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
-ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
-round(ZZ_fit, 2)
+```{r get_ZZ_rot}
 ## rotation matrix
 HH_inv <- varimax(ZZ_fit)$rotmat
 ## rotated Z
