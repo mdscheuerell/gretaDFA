@@ -109,9 +109,9 @@ The second will fill in the diagonal of the prior for the loadings matrix $\math
 ```{r}
 zd <- function(M, sigma) {
   ## initial greta array
-  zd <- zeros(M-1)
+  zd <- zeros(M)
   ## elements 1:(M-1) get L&D prior
-  for(i in 1:(M-1)) {
+  for(i in 1:M) {
     zd[i] <- ld(i, M = M, sigma = sigma, dim = 1)
   }
   ## element M gets truncated normal
@@ -179,10 +179,10 @@ ld_distribution <- R6Class (
         
       }
       
-      # check if M > i
-      if (M - i < 1) {
+      # check if i > M
+      if (i > M) {
         
-        stop ("i can be no larger than M - 1",
+        stop ("i can be no larger than M",
               call. = FALSE)
         
       }
@@ -280,7 +280,7 @@ The matrix $\mathbf{Z}$ maps the factors $\mathbf{x}$ onto the observations $\ma
 # }
 
 ZZ <- matrix(runif(NN*MM, -1, 1), NN, MM)
-diag(ZZ) <- abs(diag(ZZ))
+diag(ZZ) <- rev(sort(abs(diag(ZZ))))
 ZZ[upper.tri(ZZ)] <- 0
 ZZ <- round(ZZ, 2)
 ```
@@ -352,18 +352,16 @@ Thus, we need to tell __greta__ which of the parameters in $\mathbf{Z}$ are to b
 ## empty loadings matrix
 ZZ_est <- zeros(NN,MM)
 ## define sigma
-sigma = normal(0, 5, truncation = c(0, Inf))
+sigma = normal(0, 2, truncation = c(0, Inf))
 # sigma <- 1
-## diagonal for elements 1:(M-1)
-idx_d <- row(ZZ_est) == col(ZZ_est) & row(ZZ_est) != MM
+## diagonal
 ZZ_est_raw_d = zd(MM, sigma)
+# ZZ_est_raw_d = normal(0, 10, MM, truncation = c(0,1))
+idx_d <- row(ZZ_est) == col(ZZ_est)
 ZZ_est[idx_d] <- ZZ_est_raw_d
-## diagonal for element M
-ZZ_est_raw_M = normal(0, sigma, dim = 1, truncation = c(0, Inf))
-ZZ_est[MM,MM] <- ZZ_est_raw_M
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 1, dim = sum(idx_s))
+ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-1,1))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -371,14 +369,12 @@ The reason we defined `ZZ_est_raw_?` separately here, rather than directly assig
 
 So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of `ZZ_est` with the following values:
 
- * 1 for the 1:(M-1) diagonal elements;
- * 2 for the M^th^ diagonal element; and
- * 3 for all of the subdiagonal elements.
+ * 1 for the diagonal elements;
+ * 2 for all of the subdiagonal elements.
 
 ```{r demo_evaluate, cache=TRUE}
 head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
-                            ZZ_est_raw_M = matrix(2),
-                            ZZ_est_raw_s = rep(3, sum(idx_s)))))
+                            ZZ_est_raw_s = rep(2, sum(idx_s)))))
 ```
 
 It looks like everything worked as expected.
@@ -445,9 +441,9 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est_raw, sigma)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 50000, thin = 50, warmup = 20000,
+mcmc_smpl <- mcmc(mod_fit, n_samples = 10000, thin = 10, warmup = 10000,
                   chains = 1, verbose = FALSE,
-                  hmc(Lmin = 1, Lmax = 50, epsilon = 0.001, diag_sd = 0.1))
+                  hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
 ```
 
 ```{r stop_timer, include=FALSE}
@@ -506,6 +502,21 @@ par_means <- mod_smry$statistics[,"Mean"]
 
 ## Loadings matrix
 
+Here are graphical representations of the correlation between the fitted and observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$. (_Note that cases where the correlation is negative occur when the sampler starts in a complimentary space._)
+
+```{r get_ZZ_fit}
+## fitted Z
+ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
+ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
+## plot
+par(mai=rep(0.1, 4), omi=rep(0.1, 4))
+corrplot(cor(ZZ, ZZ_fit), method="ellipse",
+         tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
+         cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
+```
+
+### Factor rotation
+
 Recall that we constrained $\mathbf{Z}$ in such a way as to choose only one of many possible solutions, but fortunately they are equivalent and can be related to each other by a rotation matrix. Let $\mathbf{H}$ be any $m \times m$ non-singular matrix.  The following are then equivalent DFA models:
 
 $$
@@ -528,13 +539,7 @@ There are many ways of doing factor rotations, but a common method is the "varim
  
 The varimax rotation is easy to compute because R has a built in function for this: `varimax()`. Interestingly, the function returns the inverse of $\mathbf{H}$, which we need anyway.  
 
-```{r get_ZZ_fit}
-## true Z
-ZZ
-## fitted Z
-ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
-ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
-round(ZZ_fit, 2)
+```{r get_ZZ_rot}
 ## rotation matrix
 HH_inv <- varimax(ZZ_fit)$rotmat
 ## rotated Z
@@ -557,12 +562,12 @@ par(mfrow=c(2,1), mai=c(0.8,0.8,0.2,0.2))
 matplot(t(xx), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=plasma(MM, end=0.8))
-matplot(t(xx_fit), type="l", lty="solid", cex=0.7,
+matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=viridis(MM, end=0.8))
 ```
 
-It's difficult to see which factors, if any, align with one another, so here is a graphical representation of their correlation.
+Here is a graphical representation of the pairwise correlation between the factors.
 
 ```{r corrplot_xx, fig.height=6, fig.width=6}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
@@ -588,7 +593,7 @@ Here is a graphical representation of the correlation between the observed and f
 ## fitted values
 yy_fit <- ZZ_fit %*% xx_fit
 ## corrrelation
-cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/10, 10)
+cor_yy <- matrix(diag(cor(t(yy_z), t(yy_fit))), NN/5, 5)
 ## plots
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
 corrplot(cor_yy, method="ellipse",
