@@ -99,7 +99,7 @@ cumsum_mat <- function(x, a=1L) {
   stopifnot(length(dim(x)) == 2)
   op("cumsum_mat",
      x,
-     tf_operation = tf$cumsum,
+     tf_operation = "tf$cumsum",
      operation_args = list(axis = a))
 }
 ```
@@ -385,7 +385,8 @@ X0 = normal(0, sqrt(10), c(MM, 1))
 ## factors for t = 2-TT
 XX = normal(0, 1, c(MM, TT))
 ## combine & cumsum over rows for the random walk
-xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
+# xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
+xx_est <- t(apply(cbind(X0,XX), 1, "cumsum"))[,-1]
 ```
 
 ### Observed data
@@ -416,8 +417,6 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
-## this fails too
-# mod_fit <- model()
 mcmc_smpl <- mcmc(mod_fit,
                   sampler = hmc(Lmin = 5, Lmax = 10, epsilon = 0.1, diag_sd = 1),
                   warmup = 2000, n_samples = 5000, thin = 10, chains = 1, 
