@@ -99,7 +99,7 @@ cumsum_mat <- function(x, a=1L) {
   stopifnot(length(dim(x)) == 2)
   op("cumsum_mat",
      x,
-     tf_operation = "tf$cumsum",
+     tf_operation = tf$cumsum,
      operation_args = list(axis = a))
 }
 ```
@@ -336,8 +336,9 @@ ZZ_est <- zeros(NN,MM)
 ## define sigma
 sigma_est = normal(0, 2, truncation = c(0, Inf))
 ## diagonal
-ZZ_est_raw_d = zd(MM, sigma_est)
 idx_d <- row(ZZ_est) == col(ZZ_est)
+ZZ_est_raw_d = zd(MM, sigma_est)
+# ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0,2))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
@@ -352,7 +353,7 @@ So, for example, if we specified $\mathbf{Z}$ correctly, the following should re
  * 1 for the diagonal elements;
  * 2 for all of the subdiagonal elements.
 
-```{r demo_evaluate, cache=TRUE}
+```{r demo_evaluate, eval=FALSE}
 head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
                             ZZ_est_raw_s = rep(2, sum(idx_s)))))
 ```
@@ -415,10 +416,13 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
-mcmc_smpl <- mcmc(mod_fit, n_samples = 1000, thin = 1, warmup = 5000,
-                  chains = 1, verbose = FALSE,
-                  hmc(Lmin = 10, Lmax = 100, epsilon = 0.1, diag_sd = 1))
-mcmc_smpl <- extra_samples(mcmc_smpl, n_samples = 4000, thin = 1, verbose = FALSE)
+## this fails too
+# mod_fit <- model()
+mcmc_smpl <- mcmc(mod_fit,
+                  sampler = hmc(Lmin = 5, Lmax = 10, epsilon = 0.1, diag_sd = 1),
+                  warmup = 2000, n_samples = 5000, thin = 10, chains = 1, 
+                  verbose = FALSE)
+# mcmc_smpl <- extra_samples(mcmc_smpl, n_samples = 5000, thin = 50, verbose = FALSE)
 ```
 
 ```{r save_samples}
@@ -440,11 +444,14 @@ It is important to determine whether or not the model has converged before we ca
 One quick option is to visually inspect the MCMC traces with `traceplot()` from the __coda__ package. Here is a matrix of traces for the elements in $\mathbf{Z}$.
 
 ```{r traceplots_Z, fig.height=15, fig.width=7}
-par(mfrow=c(NN,MM), mai=rep(0,4), omi=rep(0,4))
+par(mfcol=c(NN,MM), mai=rep(0,4), omi=rep(0,4))
+cnt <- 1
 for(i in 1:NN) {
 	for(j in 1:MM) {
-		coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
+		# coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
+		coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est",cnt)],
 		ylab="", xlab="", yaxt="n", xaxt="n")
+	  cnt <- cnt + 1
 	}
 }
 ```
@@ -522,6 +529,12 @@ HH_inv <- varimax(ZZ_fit)$rotmat
 ## rotated Z
 ZZ_rot <- ZZ_fit %*% HH_inv
 round(ZZ_rot, 2)
+```
+
+Here is the correlation between the actual $\mathbf{Z}$ and the estimated $\hat{\mathbf{Z}}$.
+
+```{r comp_ZZ_fits}
+round(cor(as.vector(ZZ), as.vector(ZZ_fit)), 2)
 ```
 
 ## Factors
