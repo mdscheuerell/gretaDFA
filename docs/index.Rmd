@@ -72,10 +72,14 @@ devtools::install_github('greta-dev/greta@dev')
 You will also need to install [TensorFlow](https://www.tensorflow.org/install/) and the [tensorflow](https://cran.r-project.org/web/packages/tensorflow/) package for __R__ before __greta__ will work. See the output below for the versions used here.
 
 ```{r load_pkgs_1, message=FALSE}
-library(tensorflow)
 library(greta)
+## R pkgs
 installed.packages()[c("greta", "tensorflow"), "Version"]
+## tensorflow
 tensorflow::tf_version()
+## tensorflow probability
+pkg <- reticulate::import("pkg_resources")
+pkg$get_distribution("tensorflow_probability")$version
 ```
 
 In addition, we also make use of the `mvrnorm()` function in the __MASS__ package, color palettes in the __viridis__ package, and the `corrplot()` function from the __corrplot__ package. 
