@@ -29,7 +29,7 @@ _Quantitative and Applied Ecology Group, School of BioSciences, University of Me
 
 __DISCLAIMER__  
 
-This vignette is still in the testing and evaluating phase and should not be considered complete or error-free.
+This vignette is still in the testing and evaluating phase and should not be considered complete or error-free. Please visit the development repo [here](https://github.com/mdscheuerell/gretaDFA) for detailed code and open issues.
 
 This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
 
@@ -330,7 +330,8 @@ ZZ_est_raw_d = zd(MM, sigma_est)
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-2,2))
+# ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-2,2))
+ZZ_est_raw_s = normal(0, sigma_est, dim = sum(idx_s), truncation = c(-2,2))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -405,10 +406,17 @@ timer_start <- proc.time()
 
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
-mcmc_smpl <- mcmc(mod_fit,
-                  sampler = hmc(Lmin = 5, Lmax = 10, epsilon = 0.1, diag_sd = 1),
-                  warmup = 2000, n_samples = 5000, thin = 10, chains = 1, 
-                  verbose = FALSE)
+mcmc_smpl <- mcmc(mod_fit, verbose = FALSE,
+                  sampler = hmc(Lmin = 1, Lmax = 15, epsilon = 0.005, diag_sd = 1),
+                  warmup = 3000, n_samples = 5000, thin = 10, chains = 1,
+                  initial_values = initials(RR_est = 0.5, sigma_est = 1
+                                            # XX = matrix(rnorm(MM*TT), MM, TT),
+                                            # ZZ_est_raw_s = matrix(rnorm(sum(idx_s),
+                                            #                             0,
+                                            #                             0.1),
+                                            #                       ncol = 1)
+                                            )
+                  )
 # mcmc_smpl <- extra_samples(mcmc_smpl, n_samples = 5000, thin = 50, verbose = FALSE)
 ```
 
@@ -433,10 +441,10 @@ One quick option is to visually inspect the MCMC traces with `traceplot()` from 
 ```{r traceplots_Z, fig.height=15, fig.width=7}
 par(mfcol=c(NN,MM), mai=rep(0,4), omi=rep(0,4))
 cnt <- 1
-for(i in 1:NN) {
-	for(j in 1:MM) {
-		# coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
-		coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est",cnt)],
+for(j in 1:MM) {
+  for(i in 1:NN) {
+    coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
+		# coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est",cnt)],
 		ylab="", xlab="", yaxt="n", xaxt="n")
 	  cnt <- cnt + 1
 	}
@@ -473,13 +481,27 @@ par_means <- mod_smry$statistics[,"Mean"]
 
 ## Loadings matrix
 
-Here are graphical representations of the correlation between the fitted and observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$. (_Note that cases where the correlation is negative occur when the sampler starts in a complimentary space._)
+Here are the tops of the estimated and true $\mathbf{Z}$.
 
-```{r get_ZZ_fit}
+```{r ZZ_fit_corr}
 ## fitted Z
 ZZ_fit <- par_means[grepl("ZZ",rownames(mod_smry$statistics))]
 ZZ_fit <- matrix(ZZ_fit, NN, MM, byrow=FALSE)
-## plot
+## fitted Z
+head(round(ZZ_fit, 2))
+## true Z
+head(ZZ)
+```
+
+The correlation between the actual $\mathbf{Z}$ and the estimated $\hat{\mathbf{Z}}$ is:
+
+```{r comp_ZZ_fits}
+round(cor(as.vector(ZZ), as.vector(ZZ_fit)), 2)
+```
+
+Here are graphical representations of the correlation between the fitted and observed values for each of the `r MM` columns in the loadings matrix $\mathbf{Z}$. (_Note that cases where the correlation is negative occur when the sampler starts in a complimentary space._)
+
+```{r ZZ_fit_corr_plot}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
 corrplot(cor(ZZ, ZZ_fit), method="ellipse",
          tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
@@ -516,12 +538,6 @@ HH_inv <- varimax(ZZ_fit)$rotmat
 ## rotated Z
 ZZ_rot <- ZZ_fit %*% HH_inv
 round(ZZ_rot, 2)
-```
-
-Here is the correlation between the actual $\mathbf{Z}$ and the estimated $\hat{\mathbf{Z}}$.
-
-```{r comp_ZZ_fits}
-round(cor(as.vector(ZZ), as.vector(ZZ_fit)), 2)
 ```
 
 ## Factors
