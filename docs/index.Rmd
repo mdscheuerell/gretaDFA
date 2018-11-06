@@ -20,7 +20,7 @@ options(tensorflow.one_based_extract = TRUE)
 <br/>
 
 [__Mark Scheuerell__](https://faculty.washington.edu/scheuerl/)  
-_Northwest Fisheries Science Center, National Oceanic and Atmospheric Administration, Seattle, WA USA_
+_Northwest Fisheries Science Center, National Oceanic and Atmospheric Administration, Seattle, WA, USA_
 
 [__Nick Golding__](https://qaeco.com/researchfellows/#ngolding)  
 _Quantitative and Applied Ecology Group, School of BioSciences, University of Melbourne, Melbourne, Victoria, AUS_
@@ -29,7 +29,7 @@ _Quantitative and Applied Ecology Group, School of BioSciences, University of Me
 
 __DISCLAIMER__  
 
-This vignette is still in the testing and evaluating phase and should not be considered complete or error-free. Please visit the development repo [here](https://github.com/mdscheuerell/gretaDFA) for detailed code and open issues.
+This vignette is still in the testing and evaluating phase and should not be considered complete or error-free. Please visit the [development repo](https://github.com/mdscheuerell/gretaDFA) for detailed code and open issues.
 
 This is version `r paste0('0.',format(Sys.time(), '%y.%m.%d'))`.
 
@@ -65,10 +65,10 @@ The [__greta__](https://greta-dev.github.io/greta/) package [@pkg_greta] is desi
 
 ## Packages
 
-For this vignette we're using the development version of __greta__, which you can install from GitHub via 
+For this vignette we're using version 0.3.0 of __greta__, which you can install from CRAN via 
 
 ```{r, eval=FALSE, message=FALSE}
-devtools::install_github('greta-dev/greta@dev')
+install.packages("greta")
 ```
 
 You will also need to install [TensorFlow](https://www.tensorflow.org/install/) and the [tensorflow](https://cran.r-project.org/web/packages/tensorflow/) package for __R__ before __greta__ will work. See the output below for the versions used here.
@@ -292,13 +292,11 @@ corrplot(rho, method="ellipse", type="lower", order = "hclust",
          cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.1)
 ```
 
-# Parameter estimation
+# Specify priors
 
 Before we can estimate the model parameters we need to specify distributions for the priors and likelihoods.
 
-## Specify priors
-
-### Loadings matrix
+## Loadings matrix
 
 To make the model identifiable when $M$ > 1, we need to impose several constraints on the model. First, the upper right triangle of $\mathbf{Z}$ must be set equal to zero (i.e., $z_{ij} = 0 ~ \forall ~ i < j$). For example, if $M$ = 3 then 
 
@@ -314,7 +312,7 @@ $$
 \end{bmatrix}.   
 $$
 
-Second, when estimating a DFA model in a Bayesian framework, as with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2014], wherein each of the diagonal elements $z_{ii}$ has density proportional to
+Second, when estimating a DFA model in a Bayesian framework, as with __greta__, we need to constrain the diagonal of $\mathbf{Z}$ to be positive to ensure convergence (i.e., $z_{ij} > 0 ~ \forall ~ i = j$). In particular, we implement the prior derived by Leung & Drton [-@leung2016], wherein each of the diagonal elements $z_{ii}$ has density proportional to
 
 $$
 x^{M-i} \exp \left\{- \frac{1}{2\sigma} x^2  \right\} ~ \forall ~  x > 0.
@@ -351,7 +349,7 @@ head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
 
 It looks like everything worked as expected.
 
-### Covariance matrix
+## Covariance matrix
 
 Defining the priors for the covariance matrix $\mathbf{R}$ is straightforward. In this case, there is no covariance among the observation errors so model them as a set of univariate normals.
 
@@ -362,7 +360,7 @@ We will scale the observations before fitting, so the maximum variance of the ob
 RR_est = inverse_gamma(alpha = 1, beta = 3, 1, truncation=c(0, 1))
 ```
 
-### Initial factors
+## Initial factors
 
 Because the factors are autoregressive processes, we need to define the initial values at time $t = 0$.
 
@@ -372,11 +370,11 @@ X0 = normal(mean = 0, sd = sqrt(10), dim = c(MM, 1))
 ```
 
 
-## Specify likelihoods
+# Specify likelihoods
+
+## Factors
 
 The next step is to specify the likelihood functions.
-
-### Factors
 
 For the factor model, we need to specify a model for the temporal evolution of the random walks. This is where we take advantage of the `cumsum_mat()` function we defined above. (Recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.)
 
@@ -387,7 +385,7 @@ XX = normal(mean = 0, sd = 1, dim = c(MM, TT))
 xx_est <- t(apply(cbind(X0,XX), 1, "cumsum"))[,-1]
 ```
 
-### Observed data
+## Observed data
 
 Because we assumed IID errors for the observations, we can make use of the vectorized form for `normal()` in __greta__ by passing in vectors of the observed data `yy_vec` and their expectation `Zx_vec`, and the scalar variance `RR_est`. 
 
@@ -404,7 +402,7 @@ Zx_vec <- t(c(ZZ_est %*% xx_est))
 distribution(yy_vec) = normal(Zx_vec, RR_est)
 ```
 
-## Fit the model
+# Fit the model
 
 Now we can define the complete model and do some MCMC sampling.
 
@@ -460,7 +458,7 @@ for(j in 1:MM) {
 }
 ```
 
-These chains clearly show evidence of nonconvergence and also some autocorrelation, suggesting we need to use a longer burnin period and perhaps some thinning as well.
+These chains show some evidence of nonconvergence and also some autocorrelation, suggesting we need to work on the MCMC control parameters in the `sampler = hmc(...)` argument to `mcmc()` and possiblly extend the warmup phase.
 
 ## Formal test
 
@@ -512,7 +510,7 @@ Here are graphical representations of the correlation between the fitted and obs
 
 ```{r ZZ_fit_corr_plot}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
-corrplot(cor(ZZ, ZZ_fit), method="ellipse",
+corrplot(cor(ZZ, ZZ_fit), method="ellipse", type="lower",
          tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
          cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
 ```
@@ -575,7 +573,7 @@ Here is a graphical representation of the pairwise correlation between the facto
 
 ```{r corrplot_xx, fig.height=6, fig.width=6}
 par(mai=rep(0.1, 4), omi=rep(0.1, 4))
-corrplot(cor(t(xx), t(xx_fit)), method="ellipse",
+corrplot(cor(t(xx), t(xx_fit)), method="ellipse", type="lower",
          tl.col = "black", tl.srt = 0, tl.cex = 0.8, tl.offset = 0.7,
          cl.cex = 0.8, cl.offset = 0.9, cl.ratio = 0.2)
 ```
