@@ -339,10 +339,11 @@ The reason we defined `ZZ_est_raw_?` separately here, rather than directly assig
 
 So, for example, if we specified $\mathbf{Z}$ correctly, the following should return the top portion of `ZZ_est` with the following values:
 
+ * 0 for the upper right;
  * 1 for the diagonal elements;
  * 2 for all of the subdiagonal elements.
 
-```{r demo_evaluate, eval=FALSE}
+```{r demo_evaluate, eval=TRUE, cache=TRUE}
 head(calculate(ZZ_est, list(ZZ_est_raw_d = rep(1, sum(idx_d)),
                             ZZ_est_raw_s = rep(2, sum(idx_s)))))
 ```
