@@ -333,7 +333,7 @@ ZZ_est_raw_d = zd(MM, sigma_est)
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-ZZ_est_raw_s = normal(0, sigma_est, dim = sum(idx_s), truncation = c(-2,2))
+ZZ_est_raw_s = normal(0, sigma_est, dim = sum(idx_s), truncation = c(-1,1))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
 
@@ -414,24 +414,24 @@ timer_start <- proc.time()
 ```
 
 ```{r greta_model, cache=TRUE}
-mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
-mcmc_smpl <- mcmc(mod_fit, verbose = FALSE,
-                  sampler = hmc(Lmin = 1, Lmax = 50, epsilon = 0.01, diag_sd = 1),
-                  warmup = 2000, n_samples = 4000, thin = 10, chains = 1,
-                  initial_values = initials(RR_est = runif(1, 0.1, 0.5),
-                                            sigma_est = runif(1, 0.1, 1)
-                                            # XX = matrix(rnorm(MM*TT), MM, TT),
-                                            # ZZ_est_raw_s = matrix(rnorm(sum(idx_s),
-                                            #                             0,
-                                            #                             0.1),
-                                            #                       ncol = 1)
-                                            )
-                  )
-# mcmc_smpl <- extra_samples(mcmc_smpl, n_samples = 5000, thin = 50, verbose = FALSE)
+mod_defn <- model(xx_est, ZZ_est, RR_est, sigma_est)
+mod_fit <- mcmc(mod_defn, verbose = FALSE,
+                sampler = hmc(Lmin = 1, Lmax = 30, epsilon = 0.001, diag_sd = 1),
+                warmup = 2000, n_samples = 5000, thin = 10, chains = 1,
+                initial_values = initials(RR_est = runif(1, 0.1, 1),
+                                          sigma_est = runif(1, 0.1, 1)
+                                          # XX = matrix(rnorm(MM*TT), MM, TT),
+                                          # ZZ_est_raw_s = matrix(rnorm(sum(idx_s),
+                                          #                             0,
+                                          #                             0.1),
+                                          #                       ncol = 1)
+                )
+)
+# mod_fit <- extra_samples(mod_fit, n_samples = 5000, thin = 50, verbose = FALSE)
 ```
 
 ```{r save_samples}
-saveRDS(mcmc_smpl, "DFA_mcmc_smpl.rds")
+saveRDS(mod_fit, "DFA_mod_fit.rds")
 ```
 
 ```{r stop_timer, include=FALSE}
@@ -453,7 +453,7 @@ par(mfcol=c(NN,MM), mai=rep(0,4), omi=rep(0,4))
 cnt <- 1
 for(j in 1:MM) {
   for(i in 1:NN) {
-    coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
+    coda::traceplot(mod_fit[[1]][,paste0("ZZ_est[",i,",",j,"]")],
 		ylab="", xlab="", yaxt="n", xaxt="n")
 	  cnt <- cnt + 1
 	}
@@ -468,9 +468,9 @@ Another more formal (and faster) option is to use the Heidelberger and Welch’s
 
 ```{r converge_chk}
 ## number of estimated params/states
-n_par <- dim(mcmc_smpl[[1]])[2]
+n_par <- dim(mod_fit[[1]])[2]
 ## H&W diag: pass (1) or fail (NA)
-halfwidth_test <- coda::heidel.diag(mcmc_smpl[[1]])[,4]
+halfwidth_test <- coda::heidel.diag(mod_fit[[1]])[,4]
 ## proportion passing
 round(sum(halfwidth_test, na.rm = TRUE) / n_par, 2)
 ```
@@ -484,7 +484,7 @@ Only about `r round(sum(halfwidth_test, na.rm = TRUE) / n_par, 2)*100`% of the e
 We begin by summarizing the MCMC samples.
 
 ```{r examine_fits}
-mod_smry <- summary(mcmc_smpl)
+mod_smry <- summary(mod_fit)
 par_means <- mod_smry$statistics[,"Mean"]
 ```
 
