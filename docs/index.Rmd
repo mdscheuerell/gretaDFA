@@ -19,7 +19,7 @@ options(tensorflow.one_based_extract = TRUE)
 
 <br/>
 
-[__Mark D. Scheuerell__](https://faculty.washington.edu/scheuerl/)  
+[__Mark Scheuerell__](https://faculty.washington.edu/scheuerl/)  
 _Northwest Fisheries Science Center, National Oceanic and Atmospheric Administration, Seattle, WA USA_
 
 [__Nick Golding__](https://qaeco.com/researchfellows/#ngolding)  
@@ -63,6 +63,8 @@ The [__greta__](https://greta-dev.github.io/greta/) package [@pkg_greta] is desi
 
 # Requirements
 
+## Packages
+
 For this vignette we're using the development version of __greta__, which you can install from GitHub via 
 
 ```{r, eval=FALSE, message=FALSE}
@@ -90,9 +92,9 @@ library(viridis)
 library(corrplot)
 ```
 
-We also need to define a helper function to fill in the diagonal of the prior for the loadings matrix $\mathbf{Z}$ with the appropriate distribution.
+## Functions
 
-The second will fill in the diagonal of the prior for the loadings matrix $\mathbf{Z}$ with the appropriate distribution.
+We need to define a helper function to fill in the diagonal of the prior for the loadings matrix $\mathbf{Z}$ with the appropriate distribution (see below).
 
 ```{r}
 zd <- function(M, sigma) {
@@ -104,7 +106,9 @@ zd <- function(M, sigma) {
 }
 ```
 
-```{r define_ld_distrib, echo = FALSE}
+We use a unique distribution for the diagonal of $\mathbf{Z}$, as defined by Leung & Drton [-@leung2014], that allows for parameter identification that is invariant to shifts in the rows of the data matrix $\mathbf{y}$. At present, this distribution is not defined internally in __greta__, so we define it explicitly here via an `R6` class.
+
+```{r define_ld_distrib}
 library (R6)
 distrib <- .internals$nodes$constructors$distrib
 distribution_node <- .internals$nodes$node_classes$distribution_node
@@ -218,7 +222,7 @@ ld_distribution <- R6Class (
 
 # Simulate data
 
-Our general approach is to create a large number of time series, each of which to a greater or lesser degree share some temporal patterns with one another. We'll use 50 time series that are 30 units long, each of which is a linear combination of 5 different latent trends.
+Our general approach is to create a large number of time series, each of which to a greater or lesser degree share some temporal patterns with one another. We'll use 30 time series that are 30 units long, each of which is a linear combination of 3 different latent trends.
 
 ```{r data_inits}
 NN <- 30
@@ -326,11 +330,9 @@ sigma_est = normal(0, 2, truncation = c(0, Inf))
 ## diagonal
 idx_d <- row(ZZ_est) == col(ZZ_est)
 ZZ_est_raw_d = zd(MM, sigma_est)
-# ZZ_est_raw_d = normal(0, 10, dim = sum(idx_d), truncation = c(0,2))
 ZZ_est[idx_d] <- ZZ_est_raw_d
 ## sub-diagonal
 idx_s <- lower.tri(ZZ_est)
-# ZZ_est_raw_s = normal(0, 10, dim = sum(idx_s), truncation = c(-2,2))
 ZZ_est_raw_s = normal(0, sigma_est, dim = sum(idx_s), truncation = c(-2,2))
 ZZ_est[idx_s] <- ZZ_est_raw_s
 ```
@@ -360,6 +362,16 @@ We will scale the observations before fitting, so the maximum variance of the ob
 RR_est = inverse_gamma(alpha = 1, beta = 3, 1, truncation=c(0, 1))
 ```
 
+### Initial factors
+
+Because the factors are autoregressive processes, we need to define the initial values at time $t = 0$.
+
+```{r prior_on_X0}
+## inital factor
+X0 = normal(mean = 0, sd = sqrt(10), dim = c(MM, 1))
+```
+
+
 ## Specify likelihoods
 
 The next step is to specify the likelihood functions.
@@ -369,12 +381,9 @@ The next step is to specify the likelihood functions.
 For the factor model, we need to specify a model for the temporal evolution of the random walks. This is where we take advantage of the `cumsum_mat()` function we defined above. (Recall that we defined the covariance matrix $\mathbf{Q}$ to be the identity matrix $\mathbf{I}$.)
 
 ```{r like_factors}
-## inital factor
-X0 = normal(0, sqrt(10), c(MM, 1))
 ## factors for t = 2-TT
-XX = normal(0, 1, c(MM, TT))
-## combine & cumsum over rows for the random walk
-# xx_est <- cumsum_mat(cbind(X0,XX))[,-1]
+XX = normal(mean = 0, sd = 1, dim = c(MM, TT))
+## cumsum over proc errs for the random walk
 xx_est <- t(apply(cbind(X0,XX), 1, "cumsum"))[,-1]
 ```
 
@@ -407,9 +416,10 @@ timer_start <- proc.time()
 ```{r greta_model, cache=TRUE}
 mod_fit <- model(xx_est, ZZ_est, RR_est, sigma_est)
 mcmc_smpl <- mcmc(mod_fit, verbose = FALSE,
-                  sampler = hmc(Lmin = 1, Lmax = 15, epsilon = 0.005, diag_sd = 1),
-                  warmup = 3000, n_samples = 5000, thin = 10, chains = 1,
-                  initial_values = initials(RR_est = 0.5, sigma_est = 1
+                  sampler = hmc(Lmin = 1, Lmax = 50, epsilon = 0.01, diag_sd = 1),
+                  warmup = 2000, n_samples = 4000, thin = 10, chains = 1,
+                  initial_values = initials(RR_est = runif(1, 0.1, 0.5),
+                                            sigma_est = runif(1, 0.1, 1)
                                             # XX = matrix(rnorm(MM*TT), MM, TT),
                                             # ZZ_est_raw_s = matrix(rnorm(sum(idx_s),
                                             #                             0,
@@ -444,7 +454,6 @@ cnt <- 1
 for(j in 1:MM) {
   for(i in 1:NN) {
     coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est[",i,",",j,"]")],
-		# coda::traceplot(mcmc_smpl[[1]][,paste0("ZZ_est",cnt)],
 		ylab="", xlab="", yaxt="n", xaxt="n")
 	  cnt <- cnt + 1
 	}
@@ -542,7 +551,7 @@ round(ZZ_rot, 2)
 
 ## Factors
 
-Here are the `r MM` factors in $\mathbf{x}$. The top panel has the true factors; the bottom panel shows the estimated factors. Note that there is no way to insure that the specific ordering of the estimated factors will match the true factors.
+Here are the `r MM` factors in $\mathbf{x}$. The top panel has the estimated factors; the bottom panel shows the true factors. Note that there is no way to insure that the specific ordering of the estimated factors will match the true factors.
 
 ```{r get_factors}
 ## fitted factors
@@ -552,14 +561,14 @@ xx_fit <- matrix(xx_fit, MM, TT, byrow=FALSE)
 
 ```{r plot_xx_fits, fig.height=7, fig.width=7, echo=FALSE}
 par(mfrow=c(2,1), mai=c(0.8,0.8,0.2,0.2))
-matplot(t(xx), type="b", lty="solid", cex=0.7,
-        xlab="", ylab=expression(italic(x)[italic(t)]),
-        col=plasma(MM, end=0.8))
-mtext("True", 3, adj = 0)
 matplot(t(xx_fit), type="b", lty="solid", cex=0.7,
         xlab="Time", ylab=expression(italic(x)[italic(t)]),
         col=viridis(MM, end=0.8))
 mtext("Fitted", 3, adj = 0)
+matplot(t(xx), type="b", lty="solid", cex=0.7,
+        xlab="", ylab=expression(italic(x)[italic(t)]),
+        col=plasma(MM, end=0.8))
+mtext("True", 3, adj = 0)
 ```
 
 Here is a graphical representation of the pairwise correlation between the factors.
